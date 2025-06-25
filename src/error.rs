@@ -45,6 +45,22 @@ pub enum CaptureError {
     /// Session management errors
     #[error("Session error: {0}")]
     Session(String),
+    
+    /// Encoding errors (FFmpeg, etc.)
+    #[error("Encoding error: {0}")]
+    EncodingError(String),
+    
+    /// Upload errors (S3, etc.)
+    #[error("Upload error: {0}")]
+    Upload(String),
+    
+    /// Invalid state errors
+    #[error("Invalid state: {0}")]
+    InvalidState(String),
+    
+    /// HLS processing errors
+    #[error("HLS error: {0}")]
+    HLS(String),
 }
 
 /// Audio-specific errors

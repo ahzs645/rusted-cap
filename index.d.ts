@@ -12,6 +12,132 @@ export interface CaptureConfig {
   /** Output format settings */
   output: OutputFormat
 }
+
+/** Recording configuration for Cap's pipeline */
+export interface RecordingConfig {
+  /** Audio capture settings */
+  audio: AudioCaptureConfig
+  /** Screen capture settings */
+  screen: ScreenCaptureConfig
+  /** Encoding settings */
+  encoding: EncodingConfig
+  /** User ID for S3 organization */
+  user_id: string
+  /** S3 bucket for uploads */
+  s3_bucket?: string
+  /** Enable real-time transcription */
+  enable_transcription: boolean
+  /** Enable real-time streaming */
+  enable_streaming: boolean
+}
+
+/** Encoding configuration */
+export interface EncodingConfig {
+  /** Audio encoding settings */
+  audio: AudioEncodingConfig
+  /** Video encoding settings */
+  video: VideoEncodingConfig
+  /** HLS segmentation settings */
+  hls: HLSConfig
+  /** Upload settings */
+  upload?: UploadConfig
+}
+
+/** Audio encoding configuration */
+export interface AudioEncodingConfig {
+  /** Audio codec (AAC) */
+  codec: "AAC"
+  /** Bitrate in bits per second */
+  bitrate: number
+  /** Sample rate in Hz */
+  sample_rate: number
+  /** Number of channels */
+  channels: number
+  /** Channel layout */
+  channel_layout: "Mono" | "Stereo" | "Surround51"
+}
+
+/** Video encoding configuration */
+export interface VideoEncodingConfig {
+  /** Video codec (H.264) */
+  codec: "H264" | "H265"
+  /** Bitrate in bits per second */
+  bitrate: number
+  /** Frame rate (fps) */
+  frame_rate: [number, number]
+  /** Video resolution */
+  resolution: [number, number]
+  /** Pixel format */
+  pixel_format: "YUV420P" | "RGBA" | "BGRA"
+  /** Hardware acceleration */
+  hardware_acceleration: boolean
+}
+
+/** HLS configuration */
+export interface HLSConfig {
+  /** Segment duration in seconds */
+  segment_duration: number
+  /** Target duration for playlist */
+  target_duration: number
+  /** Number of segments to keep in playlist */
+  playlist_size: number
+}
+
+/** Upload configuration */
+export interface UploadConfig {
+  /** S3 bucket name */
+  bucket: string
+  /** AWS region */
+  region: string
+  /** Upload timeout in seconds */
+  timeout_seconds: number
+  /** Whether to use accelerated transfer */
+  accelerated_transfer: boolean
+  /** Custom endpoint */
+  endpoint?: string
+}
+
+/** Recording session information */
+export interface RecordingSession {
+  /** Session ID */
+  id: string
+  /** User ID */
+  user_id: string
+  /** Start timestamp */
+  start_time: number
+  /** Current status */
+  status: "Initializing" | "Recording" | "Paused" | "Stopping" | "Stopped" | { Error: string }
+  /** Stream URLs */
+  stream_urls: StreamUrls
+  /** Recording statistics */
+  stats: RecordingStats
+}
+
+/** Stream URLs for different content types */
+export interface StreamUrls {
+  /** Master playlist URL */
+  master?: string
+  /** Video stream URL */
+  video?: string
+  /** Audio stream URL */
+  audio?: string
+  /** Combined stream URL */
+  combined?: string
+}
+
+/** Recording statistics */
+export interface RecordingStats {
+  /** Duration in seconds */
+  duration: number
+  /** Number of video frames captured */
+  video_frames: number
+  /** Number of audio segments processed */
+  audio_segments: number
+  /** Total bytes uploaded */
+  bytes_uploaded: number
+  /** Average encoding FPS */
+  avg_fps: number
+}
 /** Audio capture configuration */
 export interface AudioCaptureConfig {
   /** Enable audio capture */
@@ -91,7 +217,11 @@ export declare function checkPermissions(): Promise<string>
 export declare function getSystemAudioSetupInstructions(): string
 /** Create a new capture session with the given configuration */
 export declare function createCaptureSession(config: string): string
-/** Start native system audio capture demonstration */
-export declare function startNativeSystemAudio(sessionId: string): Promise<string>
-/** Test native system audio capture capabilities */
-export declare function testNativeSystemAudio(): string
+/** Create a new recording pipeline with Cap's architecture */
+export declare function createRecordingPipeline(config: string): Promise<string>
+/** Start recording with the specified session */
+export declare function startRecording(sessionId: string): Promise<string>
+/** Stop recording and finalize segments */
+export declare function stopRecording(sessionId: string): Promise<string>
+/** Get encoding capabilities and configuration options */
+export declare function getEncodingCapabilities(): string

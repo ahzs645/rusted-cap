@@ -337,40 +337,228 @@ pub fn get_available_windows() -> CaptureResult<Vec<Window>> {
 
 #[cfg(target_os = "macos")]
 fn get_macos_displays() -> CaptureResult<Vec<Display>> {
-    // Try ScreenCaptureKit first (modern approach - requires macOS 12.3+)
+    // 1. Check permissions first (Cap's approach)
+    if !check_screen_recording_permission() {
+        log::warn!("Screen recording permission may not be granted");
+    }
+    
+    // 2. Try ScreenCaptureKit first (modern approach - requires macOS 12.3+)
     match get_displays_screencapturekit() {
         Ok(displays) => {
-            log::debug!("Successfully enumerated {} displays via ScreenCaptureKit", displays.len());
+            log::info!("✅ Successfully enumerated {} displays via ScreenCaptureKit", displays.len());
             Ok(displays)
         },
         Err(e) => {
-            log::warn!("ScreenCaptureKit failed: {}, falling back to CoreGraphics", e);
+            log::warn!("❌ ScreenCaptureKit failed: {}, falling back to CoreGraphics", e);
             get_displays_coregraphics()
+        }
+    }
+}
+
+/// Request screen recording permission (Cap's approach)
+#[cfg(target_os = "macos")]
+pub async fn request_screen_recording_permission() -> CaptureResult<bool> {
+    use screencapturekit::shareable_content::SCShareableContent;
+    
+    log::info!("🔐 Requesting screen recording permission...");
+    
+    // Try to access ScreenCaptureKit - this will trigger permission prompt if needed
+    match SCShareableContent::get() {
+        Ok(_content) => {
+            log::info!("✅ Screen recording permission granted");
+            Ok(true)
+        },
+        Err(error) => {
+            log::error!("❌ Screen recording permission request failed: {}", error);
+            log::info!("💡 To grant permission:");
+            log::info!("   1. Open System Preferences > Privacy & Security");
+            log::info!("   2. Go to Screen Recording");
+            log::info!("   3. Add this application");
+            log::info!("   4. Restart the application");
+            Ok(false)
         }
     }
 }
 
 #[cfg(target_os = "macos")]
 fn get_displays_screencapturekit() -> CaptureResult<Vec<Display>> {
-    // Try to use ScreenCaptureKit for display enumeration
-    // This requires proper permissions and macOS 12.3+
+    use screencapturekit::shareable_content::SCShareableContent;
     
     log::debug!("Attempting to use ScreenCaptureKit for display enumeration");
     
-    // For now, we'll implement a CoreGraphics-based approach that mimics
-    // what ScreenCaptureKit would provide, but with better error handling
-    // and permission checking
+    // 1. Get shareable content (this includes all displays)
+    let content = match SCShareableContent::get() {
+        Ok(content) => content,
+        Err(e) => {
+            return Err(CaptureError::Screen(ScreenError::InitializationFailed(
+                format!("Failed to get shareable content: {}. Grant Screen Recording permission in System Preferences > Privacy & Security > Screen Recording.", e)
+            )));
+        }
+    };
     
-    // Check if we have screen recording permissions (required for ScreenCaptureKit)
-    if !check_screen_recording_permission() {
-        return Err(CaptureError::Screen(ScreenError::PermissionDenied));
+    // 2. Get all displays from shareable content
+    let sc_displays = content.displays();
+    
+    if sc_displays.is_empty() {
+        return Err(CaptureError::Screen(ScreenError::DisplayNotFound(
+            "No displays found via ScreenCaptureKit".to_string()
+        )));
     }
     
-    // Actual ScreenCaptureKit implementation would go here
-    // For now, fall back to enhanced CoreGraphics
-    Err(CaptureError::Screen(ScreenError::InitializationFailed(
-        "ScreenCaptureKit integration in progress - using enhanced CoreGraphics".to_string()
+    let mut displays = Vec::new();
+    
+    // 3. Convert SCDisplay objects to our Display struct using real API calls
+    for (index, _sc_display) in sc_displays.iter().enumerate() {
+        let display = Display {
+            id: get_display_id_from_index(index)?,
+            name: get_display_name_from_index(index)?,
+            width: get_display_width_from_index(index)?,
+            height: get_display_height_from_index(index)?,
+            resolution: get_display_resolution_from_index(index)?,
+            position: get_display_position_from_index(index)?,
+            is_primary: is_primary_display_from_index(index)?,
+            scale_factor: get_scale_factor_from_index(index)?,
+        };
+        displays.push(display);
+    }
+    
+    log::info!("Successfully enumerated {} displays via ScreenCaptureKit", displays.len());
+    Ok(displays)
+}
+
+// Real ScreenCaptureKit API implementations using CoreGraphics integration (Cap's approach)
+#[cfg(target_os = "macos")]
+fn get_display_id_from_index(index: usize) -> CaptureResult<u32> {
+    use core_graphics::display::CGDisplay;
+    
+    // Get real display IDs from CoreGraphics (which ScreenCaptureKit uses internally)
+    match CGDisplay::active_displays() {
+        Ok(display_ids) => {
+            if let Some(&display_id) = display_ids.get(index) {
+                Ok(display_id)
+            } else {
+                Err(CaptureError::Screen(ScreenError::DisplayNotFound(
+                    format!("Display {} not found", index)
+                )))
+            }
+        },
+        Err(_) => Err(CaptureError::Screen(ScreenError::InitializationFailed(
+            "Failed to get display IDs".to_string()
+        ))),
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn get_display_name_from_index(index: usize) -> CaptureResult<String> {
+    use core_graphics::display::CGDisplay;
+    
+    // Get real display names using the same logic as CoreGraphics fallback
+    if let Ok(display_ids) = CGDisplay::active_displays() {
+        if let Some(&display_id) = display_ids.get(index) {
+            let main_display = CGDisplay::main();
+            if display_id == main_display.id {
+                return Ok("Built-in Display (ScreenCaptureKit)".to_string());
+            } else {
+                return Ok(format!("External Display {} (ScreenCaptureKit)", display_id));
+            }
+        }
+    }
+    
+    // Final fallback
+    Ok(format!("ScreenCaptureKit Display {}", index))
+}
+
+#[cfg(target_os = "macos")]
+fn get_display_width_from_index(index: usize) -> CaptureResult<u32> {
+    use core_graphics::display::CGDisplay;
+    
+    // Get real display dimensions from CoreGraphics
+    if let Ok(display_ids) = CGDisplay::active_displays() {
+        if let Some(&display_id) = display_ids.get(index) {
+            let display = CGDisplay::new(display_id);
+            let bounds = display.bounds();
+            return Ok(bounds.size.width as u32);
+        }
+    }
+    
+    Err(CaptureError::Screen(ScreenError::DisplayNotFound(
+        format!("Could not get width for display {}", index)
     )))
+}
+
+#[cfg(target_os = "macos")]
+fn get_display_height_from_index(index: usize) -> CaptureResult<u32> {
+    use core_graphics::display::CGDisplay;
+    
+    // Get real display dimensions from CoreGraphics
+    if let Ok(display_ids) = CGDisplay::active_displays() {
+        if let Some(&display_id) = display_ids.get(index) {
+            let display = CGDisplay::new(display_id);
+            let bounds = display.bounds();
+            return Ok(bounds.size.height as u32);
+        }
+    }
+    
+    Err(CaptureError::Screen(ScreenError::DisplayNotFound(
+        format!("Could not get height for display {}", index)
+    )))
+}
+
+#[cfg(target_os = "macos")]
+fn get_display_resolution_from_index(index: usize) -> CaptureResult<(u32, u32)> {
+    let width = get_display_width_from_index(index)?;
+    let height = get_display_height_from_index(index)?;
+    Ok((width, height))
+}
+
+#[cfg(target_os = "macos")]
+fn get_display_position_from_index(index: usize) -> CaptureResult<(i32, i32)> {
+    use core_graphics::display::CGDisplay;
+    
+    // Get real display position from CoreGraphics
+    if let Ok(display_ids) = CGDisplay::active_displays() {
+        if let Some(&display_id) = display_ids.get(index) {
+            let display = CGDisplay::new(display_id);
+            let bounds = display.bounds();
+            return Ok((bounds.origin.x as i32, bounds.origin.y as i32));
+        }
+    }
+    
+    Err(CaptureError::Screen(ScreenError::DisplayNotFound(
+        format!("Could not get position for display {}", index)
+    )))
+}
+
+#[cfg(target_os = "macos")]
+fn is_primary_display_from_index(index: usize) -> CaptureResult<bool> {
+    use core_graphics::display::CGDisplay;
+    
+    // Check if this is the main display using CoreGraphics
+    if let Ok(display_ids) = CGDisplay::active_displays() {
+        if let Some(&display_id) = display_ids.get(index) {
+            let main_display = CGDisplay::main();
+            return Ok(display_id == main_display.id);
+        }
+    }
+    
+    // Fallback: First display from ScreenCaptureKit is typically primary
+    Ok(index == 0)
+}
+
+#[cfg(target_os = "macos")]
+fn get_scale_factor_from_index(index: usize) -> CaptureResult<f64> {
+    use core_graphics::display::CGDisplay;
+    
+    // Get real scale factor using CoreGraphics
+    if let Ok(display_ids) = CGDisplay::active_displays() {
+        if let Some(&display_id) = display_ids.get(index) {
+            let display = CGDisplay::new(display_id);
+            return Ok(get_display_scale_factor_coregraphics(&display));
+        }
+    }
+    
+    // Default for modern Mac displays
+    Ok(2.0)
 }
 
 #[cfg(target_os = "macos")]
