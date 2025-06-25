@@ -310,7 +310,7 @@ if (!nativeBinding) {
   throw new Error(`Failed to load native binding`)
 }
 
-const { AudioFormat, VideoFormat, init, getAudioDevices, getDisplays, requestPermissions, checkPermissions, getSystemAudioSetupInstructions, createCaptureSession } = nativeBinding
+const { AudioFormat, VideoFormat, init, getAudioDevices, getDisplays, requestPermissions, checkPermissions, getSystemAudioSetupInstructions, createCaptureSession, startNativeSystemAudio, testNativeSystemAudio } = nativeBinding
 
 module.exports.AudioFormat = AudioFormat
 module.exports.VideoFormat = VideoFormat
@@ -321,3 +321,5 @@ module.exports.requestPermissions = requestPermissions
 module.exports.checkPermissions = checkPermissions
 module.exports.getSystemAudioSetupInstructions = getSystemAudioSetupInstructions
 module.exports.createCaptureSession = createCaptureSession
+module.exports.startNativeSystemAudio = startNativeSystemAudio
+module.exports.testNativeSystemAudio = testNativeSystemAudio

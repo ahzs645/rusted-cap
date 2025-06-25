@@ -17,15 +17,15 @@ tokio = { version = "1.0", features = ["full"] }
 futures = "0.3"
 
 # Audio processing
-cpal = "0.15"
+cpal = { git = "https://github.com/RustAudio/cpal", rev = "f43d36e55494993bbbde3299af0c53e5cdf4d4cf" }
 hound = "3.5"
 
-# FFmpeg for audio encoding
-ffmpeg = { package = "ffmpeg-next", version = "7.0", optional = true }
+# FFmpeg for audio encoding (Cap's fork)
+ffmpeg = { package = "ffmpeg-next", git = "https://github.com/CapSoftware/rust-ffmpeg", rev = "49db1fede112", optional = true }
 ffmpeg-sys-next = { version = "7.1.0", optional = true, features = ["build"] }
 
-# Video/Screen capture - let's use a different approach for now
-# scap = { version = "0.1.1" }
+# Cap's screen capture library
+scap = { git = "https://github.com/CapSoftware/scap", rev = "b914379d787f" }
 
 # FFI for Node.js integration
 napi = { version = "2.0", features = ["async"] }
@@ -39,10 +39,11 @@ thiserror = "1.0"
 log = "0.4"
 env_logger = "0.10"
 uuid = { version = "1.0", features = ["v4"] }
+lazy_static = "1.4"
 
 # Platform-specific dependencies
 [target.'cfg(target_os = "macos")'.dependencies]
-screencapturekit = "0.2"
+screencapturekit = { git = "https://github.com/CapSoftware/screencapturekit-rs", rev = "7ff1e103742e56c8f6c2e940b5e52684ed0bed69" }
 core-foundation = "0.9"
 objc = "0.2"
 cocoa = "0.24"

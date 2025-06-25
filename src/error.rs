@@ -41,6 +41,10 @@ pub enum CaptureError {
     /// General errors
     #[error("General error: {0}")]
     General(#[from] anyhow::Error),
+    
+    /// Session management errors
+    #[error("Session error: {0}")]
+    Session(String),
 }
 
 /// Audio-specific errors

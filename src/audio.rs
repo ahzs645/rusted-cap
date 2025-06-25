@@ -144,6 +144,18 @@ impl AudioProcessor {
         Ok(())
     }
 
+    /// Start audio capture (alias for session management)
+    pub async fn start_capture(&mut self, tx: mpsc::UnboundedSender<AudioSegment>) -> CaptureResult<()> {
+        self.segment_sender = Some(tx);
+        self.start().await?;
+        Ok(())
+    }
+
+    /// Stop audio capture (alias for session management)
+    pub async fn stop_capture(&mut self) -> CaptureResult<()> {
+        self.stop().await
+    }
+
     /// Create microphone input stream
     fn create_microphone_stream(&self, tx: mpsc::UnboundedSender<AudioSegment>) -> CaptureResult<Stream> {
         let host = cpal::default_host();

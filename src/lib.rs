@@ -6,6 +6,7 @@
 //! and real-time audio processing applications.
 
 use napi_derive::napi;
+use serde_json;
 
 pub mod audio;
 pub mod screen;
@@ -78,27 +79,177 @@ pub fn get_system_audio_setup_instructions() -> String {
 /// Create a new capture session with the given configuration
 #[napi(js_name = "createCaptureSession")]
 pub fn create_capture_session(config: String) -> napi::Result<String> {
-    // For now, return a mock session object since the full audio processor implementation
-    // would require complex async handling and proper session management
+    // Parse config to validate it
+    let _capture_config: CaptureConfig = serde_json::from_str(&config)
+        .map_err(|e| napi::Error::from_reason(format!("Invalid config: {}", e)))?;
     
+    // For now, create a session ID and return enhanced session info
     let session_id = uuid::Uuid::new_v4().to_string();
     
-    let session = serde_json::json!({
+    let session_data = serde_json::json!({
         "id": session_id,
         "config": serde_json::from_str::<serde_json::Value>(&config).unwrap_or(serde_json::json!({})),
         "status": "created",
+        "capabilities": {
+            "audio": true,
+            "realtime": true,
+            "screen": true,
+            "screencapturekit": cfg!(target_os = "macos"),
+            "native_system_audio": cfg!(target_os = "macos")
+        },
+        "platform": {
+            "os": std::env::consts::OS,
+            "supports_native_system_audio": cfg!(target_os = "macos")
+        },
         "timestamp": std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
-            .as_millis(),
-        "capabilities": {
-            "audio": true,
-            "screen": true,
-            "realtime": true
-        }
+            .as_millis()
     });
     
-    Ok(session.to_string())
+    log::info!("Created capture session: {}", session_id);
+    Ok(session_data.to_string())
+}
+
+/// Start native system audio capture demonstration
+#[napi]
+pub async fn start_native_system_audio(session_id: String) -> napi::Result<String> {
+    #[cfg(target_os = "macos")]
+    {
+        // Demonstrate Cap's ScreenCaptureKit approach (simplified)
+        log::info!("Starting ScreenCaptureKit system audio capture (demo)...");
+        
+        // In a real implementation, this would:
+        // 1. Create SCStreamConfiguration with audio enabled
+        // 2. Get shareable content and displays
+        // 3. Create content filter for display capture
+        // 4. Create stream delegate for audio callbacks
+        // 5. Start SCStream capture
+        
+        let result = serde_json::json!({
+            "status": "started",
+            "session_id": session_id,
+            "method": "screencapturekit",
+            "message": "ScreenCaptureKit system audio capture started (demo mode)",
+            "implementation_notes": {
+                "real_implementation": "Would use SCStream with audio enabled",
+                "audio_source": "System audio + applications",
+                "no_virtual_drivers": true,
+                "requires_permission": "Screen Recording permission in System Preferences"
+            },
+            "next_steps": [
+                "Add proper ScreenCaptureKit bindings",
+                "Implement SCStreamDelegate for audio callbacks", 
+                "Convert CMSampleBuffer to audio segments",
+                "Send to transcription service"
+            ]
+        });
+        
+        Ok(result.to_string())
+    }
+    
+    #[cfg(target_os = "windows")]
+    {
+        log::info!("Starting WASAPI loopback system audio capture (demo)...");
+        
+        let result = serde_json::json!({
+            "status": "started",
+            "session_id": session_id,
+            "method": "wasapi_loopback",
+            "message": "WASAPI loopback system audio capture started (demo mode)",
+            "implementation_notes": {
+                "real_implementation": "Would use WASAPI loopback mode",
+                "audio_source": "System audio loopback",
+                "no_virtual_drivers": true
+            }
+        });
+        
+        Ok(result.to_string())
+    }
+    
+    #[cfg(target_os = "linux")]
+    {
+        log::info!("Starting PipeWire system audio capture (demo)...");
+        
+        let result = serde_json::json!({
+            "status": "started", 
+            "session_id": session_id,
+            "method": "pipewire_monitor",
+            "message": "PipeWire monitor system audio capture started (demo mode)",
+            "implementation_notes": {
+                "real_implementation": "Would use PipeWire monitor sources",
+                "audio_source": "Monitor of system audio output",
+                "no_virtual_drivers": true
+            }
+        });
+        
+        Ok(result.to_string())
+    }
+    
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+    {
+        Err(napi::Error::from_reason("Native system audio capture not implemented for this platform"))
+    }
+}
+
+/// Test native system audio capture capabilities
+#[napi]
+pub fn test_native_system_audio() -> napi::Result<String> {
+    #[cfg(target_os = "macos")]
+    {
+        let result = serde_json::json!({
+            "platform": "macOS",
+            "method": "ScreenCaptureKit",
+            "available": true,
+            "description": "Uses ScreenCaptureKit for true system audio capture without virtual drivers",
+            "requirements": [
+                "Screen Recording permission in System Preferences",
+                "macOS 12.3 or later",
+                "No BlackHole or virtual drivers needed"
+            ]
+        });
+        Ok(result.to_string())
+    }
+    
+    #[cfg(target_os = "windows")]
+    {
+        let result = serde_json::json!({
+            "platform": "Windows",
+            "method": "WASAPI Loopback",
+            "available": true,
+            "description": "Uses WASAPI loopback for system audio capture",
+            "requirements": [
+                "Windows Vista or later",
+                "No additional drivers needed"
+            ]
+        });
+        Ok(result.to_string())
+    }
+    
+    #[cfg(target_os = "linux")]
+    {
+        let result = serde_json::json!({
+            "platform": "Linux",
+            "method": "PipeWire/PulseAudio",
+            "available": true,
+            "description": "Uses PipeWire or PulseAudio monitor sources",
+            "requirements": [
+                "PipeWire or PulseAudio",
+                "Monitor audio sources enabled"
+            ]
+        });
+        Ok(result.to_string())
+    }
+    
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+    {
+        let result = serde_json::json!({
+            "platform": "Unsupported",
+            "available": false,
+            "description": "Native system audio capture not implemented for this platform"
+        });
+        Ok(result.to_string())
+    }
 }
 
 #[cfg(test)]
