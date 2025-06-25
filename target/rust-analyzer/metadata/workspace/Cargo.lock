@@ -188,6 +188,7 @@ dependencies = [
  "anyhow",
  "cocoa 0.24.1",
  "core-foundation 0.9.4",
+ "core-graphics 0.23.2",
  "cpal 0.15.3 (git+https://github.com/RustAudio/cpal?rev=f43d36e55494993bbbde3299af0c53e5cdf4d4cf)",
  "env_logger",
  "ffmpeg-next",

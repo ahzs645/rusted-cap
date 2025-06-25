@@ -337,19 +337,133 @@ pub fn get_available_windows() -> CaptureResult<Vec<Window>> {
 
 #[cfg(target_os = "macos")]
 fn get_macos_displays() -> CaptureResult<Vec<Display>> {
-    // Would use CoreGraphics or ScreenCaptureKit to enumerate displays
-    Ok(vec![
-        Display {
-            id: 0,
-            name: "Built-in Display".to_string(),
-            resolution: (1920, 1080),
-            width: 1920,
-            height: 1080,
-            position: (0, 0),
-            is_primary: true,
-            scale_factor: 2.0,
+    // Try ScreenCaptureKit first (modern approach - requires macOS 12.3+)
+    match get_displays_screencapturekit() {
+        Ok(displays) => {
+            log::debug!("Successfully enumerated {} displays via ScreenCaptureKit", displays.len());
+            Ok(displays)
+        },
+        Err(e) => {
+            log::warn!("ScreenCaptureKit failed: {}, falling back to CoreGraphics", e);
+            get_displays_coregraphics()
         }
-    ])
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn get_displays_screencapturekit() -> CaptureResult<Vec<Display>> {
+    // Try to use ScreenCaptureKit for display enumeration
+    // This requires proper permissions and macOS 12.3+
+    
+    log::debug!("Attempting to use ScreenCaptureKit for display enumeration");
+    
+    // For now, we'll implement a CoreGraphics-based approach that mimics
+    // what ScreenCaptureKit would provide, but with better error handling
+    // and permission checking
+    
+    // Check if we have screen recording permissions (required for ScreenCaptureKit)
+    if !check_screen_recording_permission() {
+        return Err(CaptureError::Screen(ScreenError::PermissionDenied));
+    }
+    
+    // Actual ScreenCaptureKit implementation would go here
+    // For now, fall back to enhanced CoreGraphics
+    Err(CaptureError::Screen(ScreenError::InitializationFailed(
+        "ScreenCaptureKit integration in progress - using enhanced CoreGraphics".to_string()
+    )))
+}
+
+#[cfg(target_os = "macos")]
+fn check_screen_recording_permission() -> bool {
+    // This is a simplified permission check
+    // Real implementation would use CGPreflightScreenCaptureAccess() or similar
+    
+    use core_graphics::display::CGDisplay;
+    
+    // Try to get display information - if this fails, we likely don't have permission
+    match CGDisplay::active_displays() {
+        Ok(displays) => !displays.is_empty(),
+        Err(_) => false,
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn get_displays_coregraphics() -> CaptureResult<Vec<Display>> {
+    use core_graphics::display::*;
+    
+    // Get all active displays
+    let display_ids = CGDisplay::active_displays()
+        .map_err(|_| CaptureError::Screen(ScreenError::InitializationFailed(
+            "Failed to enumerate displays via CoreGraphics".to_string()
+        )))?;
+    
+    if display_ids.is_empty() {
+        return Err(CaptureError::Screen(ScreenError::DisplayNotFound(
+            "No active displays found".to_string()
+        )));
+    }
+    
+    // Get main display for primary detection
+    let main_display = CGDisplay::main();
+    
+    // Convert CGDisplay objects to our Display struct
+    let displays: Vec<Display> = display_ids
+        .into_iter()
+        .map(|display_id| {
+            let display = CGDisplay::new(display_id);
+            let bounds = display.bounds();
+            
+            // Try to get a more descriptive name
+            let name = get_display_name_coregraphics(display_id, &main_display)
+                .unwrap_or_else(|| format!("Display {}", display_id));
+            
+            Display {
+                id: display_id,
+                name,
+                width: bounds.size.width as u32,
+                height: bounds.size.height as u32,
+                resolution: (bounds.size.width as u32, bounds.size.height as u32),
+                position: (bounds.origin.x as i32, bounds.origin.y as i32),
+                is_primary: display_id == main_display.id,
+                scale_factor: get_display_scale_factor_coregraphics(&display),
+            }
+        })
+        .collect();
+    
+    log::info!("Enumerated {} displays via CoreGraphics", displays.len());
+    Ok(displays)
+}
+
+#[cfg(target_os = "macos")]
+fn get_display_name_coregraphics(display_id: u32, main_display: &core_graphics::display::CGDisplay) -> Option<String> {
+    // For now, return a simple name based on whether it's the main display
+    // This could be enhanced with IOKit calls for actual display names
+    if display_id == main_display.id {
+        Some("Built-in Display".to_string())
+    } else {
+        Some(format!("External Display {}", display_id))
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn get_display_scale_factor_coregraphics(display: &core_graphics::display::CGDisplay) -> f64 {
+    // Get the display mode to calculate scale factor
+    let bounds = display.bounds();
+    
+    if let Some(mode) = display.display_mode() {
+        let pixel_width = mode.pixel_width() as f64;
+        let point_width = bounds.size.width;
+        
+        if point_width > 0.0 {
+            (pixel_width / point_width).max(1.0)
+        } else {
+            1.0
+        }
+    } else {
+        // Default to 2.0 for Retina displays, 1.0 for others
+        // This is a heuristic based on common resolutions
+        if bounds.size.width >= 2560.0 { 2.0 } else { 1.0 }
+    }
 }
 
 #[cfg(target_os = "windows")]

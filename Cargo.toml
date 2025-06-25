@@ -45,6 +45,7 @@ lazy_static = "1.4"
 [target.'cfg(target_os = "macos")'.dependencies]
 screencapturekit = { git = "https://github.com/CapSoftware/screencapturekit-rs", rev = "7ff1e103742e56c8f6c2e940b5e52684ed0bed69" }
 core-foundation = "0.9"
+core-graphics = "0.23"
 objc = "0.2"
 cocoa = "0.24"
 

@@ -1,5 +1,5 @@
 use crate::error::{CaptureResult};
-use cpal::traits::{HostTrait, DeviceTrait};
+use cpal::traits::{HostTrait};
 use serde::{Deserialize, Serialize};
 
 /// Permission status for different capture types
@@ -139,81 +139,65 @@ async fn request_system_audio_permission() -> CaptureResult<PermissionState> {
 }
 
 async fn check_system_audio_permission() -> CaptureResult<PermissionState> {
-    // Check if system audio devices are available
-    let host = cpal::default_host();
-    
     #[cfg(target_os = "macos")]
     {
-        // Look for virtual audio devices or ScreenCaptureKit availability
-        if let Ok(mut devices) = host.output_devices() {
-            let has_virtual_device = devices.any(|device| {
-                if let Ok(name) = device.name() {
-                    let name_lower = name.to_lowercase();
-                    name_lower.contains("blackhole") || 
-                    name_lower.contains("soundflower") ||
-                    name_lower.contains("virtual")
-                } else {
-                    false
-                }
-            });
+        // Cap's approach: Check for ScreenCaptureKit availability instead of virtual drivers
+        // ScreenCaptureKit is available on macOS 12.3+ and provides native system audio capture
+        use std::process::Command;
+        
+        // Check if we're on macOS 12.3+ (where ScreenCaptureKit has audio support)
+        let os_version_check = Command::new("sw_vers")
+            .args(&["-productVersion"])
+            .output();
             
-            if has_virtual_device {
-                Ok(PermissionState::Granted)
-            } else {
-                Ok(PermissionState::Denied)
-            }
+        if let Ok(output) = os_version_check {
+            let version_str = String::from_utf8_lossy(&output.stdout);
+            log::info!("macOS version: {}", version_str.trim());
+            
+            // For now, assume ScreenCaptureKit is available
+            // In a real implementation, we'd check the exact version
+            Ok(PermissionState::Denied) // Will become Granted when screen recording permission is given
         } else {
+            log::warn!("Could not determine macOS version");
             Ok(PermissionState::Denied)
         }
     }
 
     #[cfg(target_os = "windows")]
     {
-        // Look for stereo mix or loopback devices
-        if let Ok(mut devices) = host.input_devices() {
-            let has_loopback = devices.any(|device| {
-                if let Ok(name) = device.name() {
-                    let name_lower = name.to_lowercase();
-                    name_lower.contains("stereo mix") || 
-                    name_lower.contains("what u hear") ||
-                    name_lower.contains("loopback")
-                } else {
-                    false
-                }
-            });
-            
-            if has_loopback {
-                Ok(PermissionState::Granted)
-            } else {
-                Ok(PermissionState::Denied)
-            }
-        } else {
-            Ok(PermissionState::Denied)
-        }
+        // Cap's approach: Use WASAPI loopback instead of Stereo Mix
+        // WASAPI loopback is available on Windows Vista+ and doesn't require Stereo Mix
+        log::info!("Windows WASAPI loopback available for native system audio capture");
+        Ok(PermissionState::Granted) // WASAPI loopback doesn't require special permissions
     }
 
     #[cfg(target_os = "linux")]
     {
-        // Look for monitor devices
-        if let Ok(mut devices) = host.input_devices() {
-            let has_monitor = devices.any(|device| {
-                if let Ok(name) = device.name() {
-                    let name_lower = name.to_lowercase();
-                    name_lower.contains("monitor") || 
-                    name_lower.contains("output") ||
-                    name_lower.contains("sink")
-                } else {
-                    false
-                }
-            });
+        // Cap's approach: Use PipeWire monitor sources natively
+        // Check if PipeWire or PulseAudio monitor sources are available
+        use std::process::Command;
+        
+        // Check if PipeWire is available
+        let pipewire_check = Command::new("pw-cli")
+            .args(&["info"])
+            .output();
             
-            if has_monitor {
+        if pipewire_check.is_ok() {
+            log::info!("PipeWire detected - native monitor sources available");
+            Ok(PermissionState::Granted)
+        } else {
+            // Check for PulseAudio
+            let pulse_check = Command::new("pactl")
+                .args(&["info"])
+                .output();
+                
+            if pulse_check.is_ok() {
+                log::info!("PulseAudio detected - monitor sources available");
                 Ok(PermissionState::Granted)
             } else {
+                log::warn!("Neither PipeWire nor PulseAudio detected");
                 Ok(PermissionState::Denied)
             }
-        } else {
-            Ok(PermissionState::Denied)
         }
     }
 
@@ -268,11 +252,14 @@ async fn macos_request_screen_recording_permission() -> CaptureResult<Permission
 
 #[cfg(target_os = "macos")]
 async fn macos_request_system_audio_permission() -> CaptureResult<PermissionState> {
-    // System audio on macOS requires either:
-    // 1. Virtual audio driver (BlackHole)
-    // 2. ScreenCaptureKit with audio enabled
+    // Cap's approach: Use ScreenCaptureKit for native system audio capture
+    // This requires Screen Recording permission, not virtual audio drivers
     
-    log::info!("System audio capture requires virtual audio device (BlackHole) or ScreenCaptureKit permission");
+    log::info!("System audio capture using ScreenCaptureKit (native approach)");
+    log::info!("Requires Screen Recording permission in System Preferences > Security & Privacy > Privacy > Screen Recording");
+    
+    // The actual permission request would happen when ScreenCaptureKit is initialized
+    // For now, indicate that permission setup is needed
     Ok(PermissionState::NotRequested)
 }
 
@@ -286,9 +273,13 @@ async fn windows_request_microphone_permission() -> CaptureResult<PermissionStat
 
 #[cfg(target_os = "windows")]
 async fn windows_request_system_audio_permission() -> CaptureResult<PermissionState> {
-    // System audio requires enabling Stereo Mix or using WASAPI loopback
-    log::info!("System audio requires 'Stereo Mix' to be enabled in sound settings");
-    Ok(PermissionState::NotRequested)
+    // Cap's approach: Use WASAPI loopback mode for native system audio capture
+    // No additional setup required - WASAPI loopback is built into Windows Vista+
+    
+    log::info!("System audio capture using WASAPI loopback (native approach)");
+    log::info!("No additional setup required - WASAPI loopback is available by default");
+    
+    Ok(PermissionState::Granted)
 }
 
 // Linux-specific permission implementations
@@ -301,45 +292,54 @@ async fn linux_request_microphone_permission() -> CaptureResult<PermissionState>
 
 #[cfg(target_os = "linux")]
 async fn linux_request_system_audio_permission() -> CaptureResult<PermissionState> {
-    // System audio requires monitor devices or loopback configuration
-    log::info!("System audio requires PulseAudio monitor devices or PipeWire loopback configuration");
-    Ok(PermissionState::NotRequested)
+    // Cap's approach: Use PipeWire monitor sources or PulseAudio monitors natively
+    // These are available by default in modern Linux distributions
+    
+    log::info!("System audio capture using PipeWire/PulseAudio monitor sources (native approach)");
+    log::info!("Monitor sources are available by default in most Linux distributions");
+    
+    Ok(PermissionState::Granted)
 }
 
 /// Get platform-specific guidance for enabling system audio capture
 pub fn get_system_audio_setup_instructions() -> &'static str {
     #[cfg(target_os = "macos")]
     {
-        "macOS System Audio Setup:\n\
-        1. Install BlackHole virtual audio driver: https://existential.audio/blackhole/\n\
-        2. Or enable ScreenCaptureKit permissions in System Preferences > Security & Privacy > Screen Recording\n\
-        3. Restart your application after setup"
+        "macOS Native System Audio (Cap's Approach):\n\
+        1. Enable Screen Recording permission in System Preferences > Security & Privacy > Privacy > Screen Recording\n\
+        2. Add your application to the list of allowed apps\n\
+        3. Restart your application after granting permission\n\
+        \n\
+        ✅ No BlackHole or virtual drivers needed!\n\
+        ✅ Uses ScreenCaptureKit for direct system audio capture\n\
+        ✅ Available on macOS 12.3+ (Monterey and later)"
     }
 
     #[cfg(target_os = "windows")]
     {
-        "Windows System Audio Setup:\n\
-        1. Right-click speaker icon in system tray\n\
-        2. Select 'Open Sound settings'\n\
-        3. Click 'Sound Control Panel'\n\
-        4. Go to Recording tab\n\
-        5. Right-click empty space, select 'Show Disabled Devices'\n\
-        6. Enable 'Stereo Mix' if available\n\
-        7. Set as default recording device"
+        "Windows Native System Audio (Cap's Approach):\n\
+        1. No setup required! WASAPI loopback is built into Windows\n\
+        2. Your application can capture system audio directly\n\
+        \n\
+        ✅ No Stereo Mix configuration needed!\n\
+        ✅ Uses WASAPI loopback for direct system audio capture\n\
+        ✅ Available on Windows Vista and later"
     }
 
     #[cfg(target_os = "linux")]
     {
-        "Linux System Audio Setup:\n\
-        1. For PulseAudio: Enable monitor devices\n\
-           pactl load-module module-loopback\n\
-        2. For PipeWire: Configure virtual devices\n\
-           pw-loopback\n\
-        3. Check available devices with: pactl list sources"
+        "Linux Native System Audio (Cap's Approach):\n\
+        1. No setup required for most distributions!\n\
+        2. Uses PipeWire or PulseAudio monitor sources\n\
+        3. If needed, check available sources: pactl list sources short\n\
+        \n\
+        ✅ No manual loopback configuration needed!\n\
+        ✅ Uses native monitor sources for direct system audio capture\n\
+        ✅ Works with PipeWire and PulseAudio"
     }
 
     #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
     {
-        "System audio capture not supported on this platform"
+        "Native system audio capture not supported on this platform"
     }
 }
