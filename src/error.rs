@@ -113,7 +113,15 @@ impl From<cpal::DeviceNameError> for CaptureError {
 
 impl From<cpal::BuildStreamError> for CaptureError {
     fn from(err: cpal::BuildStreamError) -> Self {
-        CaptureError::Audio(AudioError::StreamError(err.to_string()))
+        let context = match &err {
+            cpal::BuildStreamError::DeviceNotAvailable => "Audio device not available - check if another app is using it",
+            cpal::BuildStreamError::InvalidArgument => "Invalid audio configuration - check sample rate and channel count",
+            cpal::BuildStreamError::BackendSpecific { err } => {
+                &format!("Audio backend error: {}", err.description)
+            },
+            _ => "Audio stream creation failed"
+        };
+        CaptureError::Audio(AudioError::StreamError(format!("{}: {}", context, err)))
     }
 }
 

@@ -12,6 +12,7 @@ pub mod screen;
 pub mod config;
 pub mod error;
 pub mod platform;
+pub mod permissions;
 
 // Re-export main types
 pub use audio::{AudioProcessor, AudioSegment};
@@ -48,6 +49,30 @@ pub fn get_displays() -> napi::Result<String> {
     
     Ok(serde_json::to_string(&displays)
         .map_err(|e| napi::Error::from_reason(format!("Failed to serialize displays: {}", e)))?)
+}
+
+/// Request all necessary permissions for audio and screen capture
+#[napi]
+pub async fn request_permissions() -> napi::Result<String> {
+    let permissions = permissions::request_all_permissions().await
+        .map_err(|e| napi::Error::from_reason(e.to_string()))?;
+    Ok(serde_json::to_string(&permissions)
+        .map_err(|e| napi::Error::from_reason(e.to_string()))?)
+}
+
+/// Check current permission status without requesting
+#[napi]
+pub async fn check_permissions() -> napi::Result<String> {
+    let permissions = permissions::check_permissions().await
+        .map_err(|e| napi::Error::from_reason(e.to_string()))?;
+    Ok(serde_json::to_string(&permissions)
+        .map_err(|e| napi::Error::from_reason(e.to_string()))?)
+}
+
+/// Get platform-specific instructions for enabling system audio capture
+#[napi]
+pub fn get_system_audio_setup_instructions() -> String {
+    permissions::get_system_audio_setup_instructions().to_string()
 }
 
 #[cfg(test)]

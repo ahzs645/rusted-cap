@@ -20,6 +20,10 @@ futures = "0.3"
 cpal = "0.15"
 hound = "3.5"
 
+# FFmpeg for audio encoding (optional)
+ffmpeg = { package = "ffmpeg-next", version = "7.0", optional = true }
+ffmpeg-sys-next = { version = "7.1.0", optional = true }
+
 # Video/Screen capture - let's use a different approach for now
 # scap = { version = "0.1.1" }
 
@@ -45,15 +49,18 @@ windows = { version = "0.52", features = [
     "Win32_Graphics_Gdi",
     "Win32_UI_WindowsAndMessaging",
     "Win32_Media_Audio",
+    "Win32_Media_MediaFoundation",
     "Win32_System_Threading",
+    "Win32_System_Com",
 ] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 pipewire = "0.7"
 libpulse-binding = "2.27"
 
+[features]
+default = []
+audio-encoding = ["ffmpeg", "ffmpeg-sys-next"]
+
 [build-dependencies]
 napi-build = "2.0"
-
-[lints]
-workspace = true

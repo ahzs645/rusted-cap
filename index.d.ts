@@ -35,16 +35,17 @@ export interface ScreenCapabilities {
 }
 
 export interface PermissionStatus {
-  microphone: Permission;
-  screenRecording: Permission;
-  systemAudio: Permission;
+  microphone: PermissionState;
+  screenRecording: PermissionState;
+  systemAudio: PermissionState;
 }
 
-export enum Permission {
+export enum PermissionState {
   Granted = 'Granted',
   Denied = 'Denied',
-  NotDetermined = 'NotDetermined',
-  NotRequired = 'NotRequired'
+  NotRequested = 'NotRequested',
+  Requesting = 'Requesting',
+  NotApplicable = 'NotApplicable'
 }
 
 export interface AudioDevice {
@@ -159,17 +160,32 @@ export declare class CaptureSession {
 /**
  * Initialize the library and check platform capabilities
  */
-export declare function init(): PlatformCapabilities;
+export declare function init(): string;
 
 /**
  * Get available audio devices
  */
-export declare function getAudioDevices(): AudioDevice[];
+export declare function getAudioDevices(): string;
 
 /**
  * Get available displays for screen capture
  */
-export declare function getDisplays(): Display[];
+export declare function getDisplays(): string;
+
+/**
+ * Request all necessary permissions for audio and screen capture
+ */
+export declare function requestPermissions(): Promise<string>;
+
+/**
+ * Check current permission status without requesting
+ */
+export declare function checkPermissions(): Promise<string>;
+
+/**
+ * Get platform-specific instructions for enabling system audio capture
+ */
+export declare function getSystemAudioSetupInstructions(): string;
 
 /**
  * Create a new capture session with configuration
@@ -181,6 +197,6 @@ export {
   AudioFormat,
   VideoFormat,
   AudioSource,
-  Permission,
+  PermissionState,
   Platform
 };

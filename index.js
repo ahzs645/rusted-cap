@@ -35,9 +35,9 @@ try {
       },
       systemVersion: '14.0',
       permissions: {
-        microphone: 'NotDetermined',
-        screenRecording: 'NotDetermined',
-        systemAudio: 'NotDetermined'
+        microphone: 'NotRequested',
+        screenRecording: 'NotRequested',
+        systemAudio: 'NotRequested'
       }
     }),
     
@@ -45,17 +45,17 @@ try {
       {
         id: 'default-input',
         name: 'Built-in Microphone',
-        deviceType: 'Input',
-        isDefault: true,
-        sampleRates: [44100, 48000],
+        device_type: 'Input',
+        is_default: true,
+        sample_rates: [44100, 48000],
         channels: [1, 2]
       },
       {
         id: 'default-output',
         name: 'Built-in Speakers',
-        deviceType: 'Output',
-        isDefault: true,
-        sampleRates: [44100, 48000],
+        device_type: 'Output',
+        is_default: true,
+        sample_rates: [44100, 48000],
         channels: [2]
       }
     ]),
@@ -64,12 +64,33 @@ try {
       {
         id: 0,
         name: 'Built-in Display',
-        resolution: [1920, 1080],
-        position: [0, 0],
-        isPrimary: true,
-        scaleFactor: 2.0
+        width: 1920,
+        height: 1080,
+        x: 0,
+        y: 0,
+        is_primary: true,
+        scale_factor: 2.0,
+        refresh_rate: 60
       }
-    ])
+    ]),
+
+    checkPermissions: () => Promise.resolve(JSON.stringify({
+      microphone: 'NotRequested',
+      screenRecording: 'NotRequested',
+      systemAudio: 'NotRequested'
+    })),
+
+    requestPermissions: () => Promise.resolve(JSON.stringify({
+      microphone: 'Granted',
+      screenRecording: 'Granted', 
+      systemAudio: 'Denied'
+    })),
+
+    getSystemAudioSetupInstructions: () => 
+      "macOS System Audio Setup:\n" +
+      "1. Install BlackHole virtual audio driver: https://existential.audio/blackhole/\n" +
+      "2. Or enable ScreenCaptureKit permissions in System Preferences > Security & Privacy > Screen Recording\n" +
+      "3. Restart your application after setup"
   };
 }
 
@@ -98,6 +119,32 @@ function getAudioDevices() {
 function getDisplays() {
   const displays = native.getDisplays();
   return JSON.parse(displays);
+}
+
+/**
+ * Check current permission status without requesting
+ * @returns {Promise<Object>} Permission status for all capture types
+ */
+async function checkPermissions() {
+  const permissions = await native.checkPermissions();
+  return JSON.parse(permissions);
+}
+
+/**
+ * Request all necessary permissions for audio and screen capture
+ * @returns {Promise<Object>} Permission status after requesting
+ */
+async function requestPermissions() {
+  const permissions = await native.requestPermissions();
+  return JSON.parse(permissions);
+}
+
+/**
+ * Get platform-specific instructions for enabling system audio capture
+ * @returns {string} Setup instructions
+ */
+function getSystemAudioSetupInstructions() {
+  return native.getSystemAudioSetupInstructions();
 }
 
 /**
@@ -203,11 +250,12 @@ const AudioSource = {
 /**
  * Permission states enum
  */
-const Permission = {
+const PermissionState = {
   GRANTED: 'Granted',
   DENIED: 'Denied',
-  NOT_DETERMINED: 'NotDetermined',
-  NOT_REQUIRED: 'NotRequired'
+  NOT_REQUESTED: 'NotRequested',
+  REQUESTING: 'Requesting',
+  NOT_APPLICABLE: 'NotApplicable'
 };
 
 module.exports = {
@@ -217,9 +265,14 @@ module.exports = {
   getDisplays,
   createCaptureSession,
   
+  // Permission functions
+  checkPermissions,
+  requestPermissions,
+  getSystemAudioSetupInstructions,
+  
   // Enums and constants
   AudioFormat,
   VideoFormat,
   AudioSource,
-  Permission
+  PermissionState
 };
