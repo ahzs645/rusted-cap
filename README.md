@@ -1,414 +1,488 @@
-# Cap Electron Capture
+# Cap Electron Capture Library
 
-A cross-platform screen capture and audio processing library designed for integration with Electron applications. This library extracts the core functionality from [Cap's](https://github.com/cap-so/cap) screen recording pipeline for use in transcription and real-time audio processing applications.
+A high-performance, cross-platform screen capture and audio processing library designed for Electron applications. Built with Rust for maximum performance and reliability, with seamless Node.js integration for real-time audio transcription and screen recording applications.
 
-## Features
+## ✨ Features
 
-- 🎤 **Real-time Audio Capture**: System audio + microphone input
-- 🖥️ **Cross-platform Screen Capture**: macOS, Windows, and Linux support
-- ⚡ **Low Latency**: Optimized for real-time processing
-- 🔊 **Audio Segmentation**: Configurable segment duration for transcription services
-- 📱 **Electron Ready**: Node.js bindings for seamless Electron integration
-- 🎯 **TypeScript Support**: Full type definitions included
-- 🛡️ **Memory Safe**: Written in Rust with proper error handling
+### 🎵 Advanced Audio Capture
+- **System Audio + Microphone**: Capture both system audio and microphone simultaneously
+- **Real-time Segmentation**: Audio segments optimized for transcription services (1-2 second chunks)
+- **Multiple Formats**: Support for WAV, Raw PCM, MP3, and AAC encoding
+- **Cross-platform**: Native implementations for macOS, Windows, and Linux
+- **Low Latency**: Optimized for real-time processing and transcription
 
-## Platform Support
+### 🖥️ Screen Capture
+- **Multi-display Support**: Capture from multiple monitors
+- **Window-specific Capture**: Target individual applications
+- **High Performance**: Hardware-accelerated capture when available
+- **Flexible Output**: Multiple video formats and quality settings
 
-| Platform | Screen Capture | System Audio | Microphone |
-|----------|----------------|--------------|------------|
-| macOS    | ✅ ScreenCaptureKit | ✅ | ✅ |
-| Windows  | ✅ Windows Capture API | ✅ WASAPI Loopback | ✅ |
-| Linux    | ✅ PipeWire/X11 | ✅ PipeWire/PulseAudio | ✅ |
+### 🔒 Permission Management
+- **Automatic Permission Requests**: Streamlined permission flow for all capture types
+- **Status Checking**: Real-time permission status monitoring
+- **Platform-specific Guidance**: Detailed setup instructions for each OS
 
-## Installation
+### 🚀 Electron Integration
+- **TypeScript Support**: Complete type definitions included
+- **Event-driven Architecture**: Real-time audio/video streaming via events
+- **Error Handling**: Comprehensive error types with contextual messages
+- **Background Processing**: Non-blocking capture with async/await support
+
+## 🏗️ Architecture
+
+### Platform-Specific Audio Capture
+
+#### macOS
+- **ScreenCaptureKit**: Native system audio capture
+- **Virtual Audio Drivers**: BlackHole/SoundFlower support
+- **Core Audio**: High-quality microphone input
+
+#### Windows
+- **WASAPI Loopback**: System audio capture
+- **Stereo Mix**: Legacy audio mixing support
+- **Windows Capture API**: Modern capture methods
+
+#### Linux
+- **PipeWire**: Modern audio subsystem support
+- **PulseAudio**: Monitor device capture
+- **ALSA**: Low-level audio interface
+
+## 🚀 Quick Start
+
+### Installation
 
 ```bash
 npm install cap-electron-capture
 ```
 
-Or using yarn:
-
-```bash
-yarn add cap-electron-capture
-```
-
-## Quick Start
-
-### Audio-Only Transcription (Recommended)
+### Basic Usage
 
 ```javascript
-const { createCaptureSession, AudioFormat } = require('cap-electron-capture');
+const { init, createCaptureSession, AudioFormat } = require('cap-electron-capture');
 
-async function startTranscription() {
-  // Create audio-only capture session
-  const session = createCaptureSession({
-    audio: {
-      enabled: true,
-      systemAudio: true,      // Capture computer output
-      microphone: true,       // Capture microphone input  
-      segmentDurationMs: 2000, // 2-second segments
-      format: AudioFormat.AAC
-    },
-    screen: {
-      enabled: false // Audio-only for transcription
-    }
-  });
+// Initialize the library
+const capabilities = JSON.parse(init());
+console.log('Platform capabilities:', capabilities);
 
-  // Start capturing
-  await session.start();
-  console.log('Audio capture started!');
-
-  // Stop after 10 seconds
-  setTimeout(async () => {
-    await session.stop();
-    console.log('Audio capture stopped!');
-  }, 10000);
-}
-
-startTranscription().catch(console.error);
-```
-
-### Full Screen + Audio Recording
-
-```javascript
-const { createCaptureSession } = require('cap-electron-capture');
-
+// Create a capture session for transcription
 const session = createCaptureSession({
   audio: {
     enabled: true,
     systemAudio: true,
     microphone: true,
-    segmentDurationMs: 1000
+    segmentDurationMs: 1500, // 1.5 second segments
+    format: AudioFormat.WAV,
+    sampleRate: 48000,
+    channels: 2
   },
   screen: {
-    enabled: true,
-    fps: 30,
-    quality: 80,
-    includeCursor: true
+    enabled: false // Audio-only for transcription
   }
 });
 
-await session.start();
+// Start capturing
+const audioStream = await session.start();
+
+// Handle real-time audio segments
+audioStream.on('data', (segment) => {
+  console.log('Received audio segment:', {
+    timestamp: segment.timestamp,
+    duration: segment.duration_ms,
+    source: segment.source, // 'Microphone', 'SystemAudio', or 'Mixed'
+    sampleRate: segment.sampleRate,
+    dataLength: segment.data.length
+  });
+  
+  // Send to transcription service
+  sendToTranscriptionService(segment);
+});
+
+// Stop when done
+await session.stop();
 ```
 
-## API Reference
+## 🔧 Electron Integration
 
-### Functions
+### Complete Transcription App Example
 
-#### `init(): PlatformCapabilities`
+```javascript
+// main.js
+const { app, BrowserWindow, ipcMain } = require('electron');
+const { createCaptureSession, checkPermissions, AudioFormat } = require('cap-electron-capture');
+
+class TranscriptionManager {
+  constructor() {
+    this.session = null;
+    this.isActive = false;
+  }
+
+  async start(config = {}) {
+    if (this.isActive) throw new Error('Already recording');
+
+    // Check permissions first
+    const permissions = JSON.parse(await checkPermissions());
+    if (permissions.microphone !== 'Granted') {
+      throw new Error('Microphone permission required');
+    }
+
+    this.session = createCaptureSession({
+      audio: {
+        enabled: true,
+        systemAudio: true,
+        microphone: true,
+        segmentDurationMs: 1500,
+        format: AudioFormat.WAV,
+        ...config.audio
+      }
+    });
+
+    const audioStream = await this.session.start();
+    this.isActive = true;
+
+    // Real-time audio processing
+    audioStream.on('data', (segment) => {
+      mainWindow.webContents.send('audio-segment', {
+        data: Array.from(segment.data),
+        sampleRate: segment.sampleRate,
+        timestamp: segment.timestamp,
+        source: segment.source
+      });
+    });
+
+    return audioStream;
+  }
+
+  async stop() {
+    if (this.session) {
+      await this.session.stop();
+      this.session = null;
+      this.isActive = false;
+    }
+  }
+}
+
+const transcriptionManager = new TranscriptionManager();
+
+// IPC handlers
+ipcMain.handle('start-transcription', async (event, config) => {
+  try {
+    await transcriptionManager.start(config);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('stop-transcription', async () => {
+  await transcriptionManager.stop();
+  return { success: true };
+});
+```
+
+### Renderer Process
+
+```javascript
+// renderer.js
+const { ipcRenderer } = require('electron');
+
+class TranscriptionUI {
+  constructor() {
+    this.isRecording = false;
+    this.audioSegments = [];
+  }
+
+  async startTranscription() {
+    const result = await ipcRenderer.invoke('start-transcription', {
+      audio: {
+        segmentDurationMs: 1500,
+        sampleRate: 48000
+      }
+    });
+
+    if (result.success) {
+      this.isRecording = true;
+      this.updateUI();
+    } else {
+      console.error('Failed to start transcription:', result.error);
+    }
+  }
+
+  async stopTranscription() {
+    const result = await ipcRenderer.invoke('stop-transcription');
+    if (result.success) {
+      this.isRecording = false;
+      this.updateUI();
+    }
+  }
+
+  handleAudioSegment(segment) {
+    // Process audio segment for transcription
+    this.audioSegments.push(segment);
+    
+    // Send to transcription service (OpenAI Whisper, Google Speech-to-Text, etc.)
+    this.transcribeSegment(segment);
+  }
+
+  async transcribeSegment(segment) {
+    // Example: Send to transcription service
+    // const transcript = await this.sendToWhisper(segment);
+    // this.displayTranscript(transcript);
+  }
+}
+
+// Listen for audio segments
+ipcRenderer.on('audio-segment', (event, segment) => {
+  transcriptionUI.handleAudioSegment(segment);
+});
+```
+
+## 🔒 Permission Management
+
+### Checking Permissions
+
+```javascript
+const { checkPermissions, requestPermissions, getSystemAudioSetupInstructions } = require('cap-electron-capture');
+
+// Check current permission status
+const permissions = JSON.parse(await checkPermissions());
+console.log('Permissions:', permissions);
+// {
+//   microphone: 'Granted',
+//   screenRecording: 'NotRequested',
+//   systemAudio: 'Denied'
+// }
+
+// Request permissions if needed
+if (permissions.microphone !== 'Granted') {
+  await requestPermissions();
+}
+
+// Get setup instructions for system audio
+if (permissions.systemAudio !== 'Granted') {
+  console.log(getSystemAudioSetupInstructions());
+}
+```
+
+### Platform-Specific Setup
+
+#### macOS
+```bash
+# Install BlackHole for system audio capture
+brew install blackhole-2ch
+```
+
+#### Windows
+1. Enable "Stereo Mix" in Windows Sound settings
+2. Or use VB-Audio Virtual Cable
+
+#### Linux
+```bash
+# For PulseAudio
+pactl load-module module-loopback
+
+# For PipeWire
+pw-loopback
+```
+
+## 📊 Audio Processing
+
+### Audio Mixing
+
+```javascript
+// The library automatically handles mixing system audio and microphone
+const session = createCaptureSession({
+  audio: {
+    systemAudio: true,
+    microphone: true,
+    // Audio will be automatically mixed
+  }
+});
+```
+
+### Format Conversion
+
+```javascript
+// Capture in different formats
+const session = createCaptureSession({
+  audio: {
+    format: AudioFormat.WAV, // or Raw, MP3, AAC
+    sampleRate: 48000,
+    channels: 2
+  }
+});
+```
+
+## 🛠️ API Reference
+
+### Core Functions
+
+#### `init(): string`
 Initialize the library and get platform capabilities.
 
-```javascript
-const capabilities = init();
-console.log(capabilities.platform); // 'MacOS', 'Windows', 'Linux'
-console.log(capabilities.audio.systemAudio); // true/false
-```
+#### `checkPermissions(): Promise<string>`
+Check current permission status for all capture types.
 
-#### `getAudioDevices(): AudioDevice[]`
-Get available audio input/output devices.
+#### `requestPermissions(): Promise<string>`
+Request necessary permissions from the user.
 
-```javascript
-const devices = getAudioDevices();
-devices.forEach(device => {
-  console.log(`${device.name} (${device.deviceType})`);
-});
-```
+#### `getAudioDevices(): string`
+Get list of available audio input/output devices.
 
-#### `getDisplays(): Display[]`
-Get available displays for screen capture.
+#### `getDisplays(): string`
+Get list of available displays for screen capture.
 
-```javascript
-const displays = getDisplays();
-displays.forEach(display => {
-  console.log(`${display.name}: ${display.resolution[0]}x${display.resolution[1]}`);
-});
-```
+#### `getSystemAudioSetupInstructions(): string`
+Get platform-specific instructions for enabling system audio.
 
-#### `createCaptureSession(config?: CaptureConfig): CaptureSession`
-Create a new capture session with optional configuration.
+### CaptureSession
 
-### Configuration
+#### `createCaptureSession(config): CaptureSession`
+Create a new capture session with the specified configuration.
+
+#### `session.start(): Promise<AudioStream>`
+Start the capture session and return an audio stream.
+
+#### `session.stop(): Promise<void>`
+Stop the capture session.
+
+#### `session.isActive(): Promise<boolean>`
+Check if the session is currently active.
+
+### Configuration Types
 
 ```typescript
 interface CaptureConfig {
-  audio: {
-    enabled: boolean;
-    systemAudio: boolean;        // Capture system output
-    microphone: boolean;         // Capture microphone input
-    sampleRate: number;          // 44100, 48000, etc.
-    channels: number;            // 1 (mono) or 2 (stereo)
-    segmentDurationMs: number;   // Segment length for real-time processing
-    microphoneDeviceId?: string; // Specific device ID (optional)
-    format: AudioFormat;         // 'Aac', 'Mp3', 'Wav', 'Raw'
-  };
-  screen: {
-    enabled: boolean;
-    displayId?: number;          // Specific display (optional)
-    fps: number;                 // Frame rate (15, 30, 60)
-    quality: number;             // 0-100 quality
-    includeCursor: boolean;      // Include cursor in capture
-    windowId?: number;           // Specific window (optional)
-  };
-  output: {
-    audio: AudioFormat;
-    video: VideoFormat;
-    outputDir?: string;          // Output directory (optional)
-    realTime: boolean;           // Real-time processing
-  };
+  audio: AudioCaptureConfig;
+  screen?: ScreenCaptureConfig;
+}
+
+interface AudioCaptureConfig {
+  enabled: boolean;
+  systemAudio: boolean;
+  microphone: boolean;
+  segmentDurationMs: number;
+  format: AudioFormat;
+  sampleRate: number;
+  channels: number;
+  microphoneDeviceId?: string;
+}
+
+enum AudioFormat {
+  Raw = 'Raw',
+  Wav = 'Wav', 
+  Mp3 = 'Mp3',
+  Aac = 'Aac'
 }
 ```
 
-### CaptureSession Class
-
-```typescript
-class CaptureSession {
-  constructor(config: CaptureConfig);
-  
-  async start(): Promise<void>;
-  async stop(): Promise<void>;
-  async isActive(): Promise<boolean>;
-}
-```
-
-## Electron Integration Example
-
-### Main Process (main.js)
-
-```javascript
-const { app, BrowserWindow, ipcMain } = require('electron');
-const { createCaptureSession, init } = require('cap-electron-capture');
-
-let mainWindow;
-let captureSession;
-
-app.whenReady().then(() => {
-  // Initialize capture library
-  const capabilities = init();
-  console.log('Platform capabilities:', capabilities);
-
-  mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
-    }
-  });
-
-  // Handle start transcription
-  ipcMain.handle('start-transcription', async () => {
-    try {
-      captureSession = createCaptureSession({
-        audio: {
-          enabled: true,
-          systemAudio: true,
-          microphone: true,
-          segmentDurationMs: 2000
-        },
-        screen: { enabled: false }
-      });
-
-      await captureSession.start();
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  // Handle stop transcription
-  ipcMain.handle('stop-transcription', async () => {
-    if (captureSession) {
-      await captureSession.stop();
-      captureSession = null;
-    }
-    return { success: true };
-  });
-});
-```
-
-### Preload Script (preload.js)
-
-```javascript
-const { contextBridge, ipcRenderer } = require('electron');
-
-contextBridge.exposeInMainWorld('captureAPI', {
-  startTranscription: () => ipcRenderer.invoke('start-transcription'),
-  stopTranscription: () => ipcRenderer.invoke('stop-transcription')
-});
-```
-
-### Renderer Process (renderer.js)
-
-```javascript
-let isRecording = false;
-
-document.getElementById('start-btn').addEventListener('click', async () => {
-  if (!isRecording) {
-    const result = await window.captureAPI.startTranscription();
-    if (result.success) {
-      isRecording = true;
-      updateUI();
-    }
-  }
-});
-
-document.getElementById('stop-btn').addEventListener('click', async () => {
-  if (isRecording) {
-    await window.captureAPI.stopTranscription();
-    isRecording = false;
-    updateUI();
-  }
-});
-```
-
-## Use Cases
-
-### 1. Real-time Transcription Apps
-Capture both system audio and microphone for meeting transcription:
-
-```javascript
-const session = createCaptureSession({
-  audio: {
-    enabled: true,
-    systemAudio: true,  // Capture Zoom/Teams audio
-    microphone: true,   // Capture user voice
-    segmentDurationMs: 1500 // Fast transcription
-  }
-});
-```
-
-### 2. Screen Recording with Commentary
-Record screen with microphone narration:
-
-```javascript
-const session = createCaptureSession({
-  audio: {
-    enabled: true,
-    systemAudio: false, // No system audio
-    microphone: true    // Only microphone
-  },
-  screen: {
-    enabled: true,
-    fps: 30,
-    quality: 90
-  }
-});
-```
-
-### 3. System Audio Analysis
-Monitor and analyze system audio output:
-
-```javascript
-const session = createCaptureSession({
-  audio: {
-    enabled: true,
-    systemAudio: true,  // Only system audio
-    microphone: false,
-    segmentDurationMs: 500 // High frequency analysis
-  }
-});
-```
-
-## Error Handling
-
-```javascript
-try {
-  const session = createCaptureSession(config);
-  await session.start();
-} catch (error) {
-  if (error.message.includes('Permission denied')) {
-    console.log('Please grant microphone/screen recording permissions');
-  } else if (error.message.includes('Device not found')) {
-    console.log('Audio device not available');
-  } else {
-    console.error('Capture error:', error);
-  }
-}
-```
-
-## Building from Source
+## 🏗️ Building from Source
 
 ### Prerequisites
 
 - Rust 1.70+
 - Node.js 16+
-- Platform-specific tools:
-  - **macOS**: Xcode command line tools
-  - **Windows**: Visual Studio Build Tools
-  - **Linux**: GCC, ALSA/PulseAudio dev packages
+- Platform-specific dependencies:
+  - macOS: Xcode Command Line Tools
+  - Windows: Visual Studio Build Tools
+  - Linux: build-essential, libasound2-dev
 
 ### Build Steps
 
 ```bash
-# Clone repository
-git clone https://github.com/cap-so/cap.git
-cd cap/cap-audio
+# Clone the repository
+git clone https://github.com/cap-so/cap-electron-capture
+cd cap-electron-capture
 
 # Install dependencies
 npm install
 
-# Build native module
+# Build the native module
 npm run build
 
 # Run tests
 npm test
 ```
 
-## Permissions
+### Development Build
 
-### macOS
-- **Microphone**: Automatically requested when needed
-- **Screen Recording**: Must be granted in System Preferences > Security & Privacy
+```bash
+# Build in debug mode (faster compilation)
+npm run build:debug
 
-### Windows
-- **Microphone**: Automatically requested when needed
-- **Screen Capture**: No special permissions required
+# Watch for changes
+npm run dev
+```
 
-### Linux
-- **Microphone**: Handled by system audio server
-- **Screen Capture**: May require Wayland portal permissions
-
-## Performance Tips
-
-1. **Segment Duration**: Use 1-3 seconds for transcription, longer for storage
-2. **Audio Format**: AAC provides best compression for real-time use
-3. **Sample Rate**: 44.1kHz is sufficient for speech transcription
-4. **Memory Usage**: Stop sessions when not needed to free resources
-
-## Troubleshooting
+## 🐛 Troubleshooting
 
 ### Common Issues
 
-**Audio device not found**
-```javascript
-// List available devices first
-const devices = getAudioDevices();
-console.log('Available devices:', devices);
+#### System Audio Not Working
+
+**macOS**: Install BlackHole virtual audio driver
+```bash
+brew install blackhole-2ch
 ```
 
-**Permission denied**
-```javascript
-// Check platform capabilities
-const capabilities = init();
-console.log('Permissions:', capabilities.permissions);
+**Windows**: Enable "Stereo Mix" in Sound settings
+1. Right-click speaker icon → Open Sound settings
+2. Sound Control Panel → Recording tab
+3. Right-click → Show Disabled Devices
+4. Enable "Stereo Mix"
+
+**Linux**: Configure PulseAudio/PipeWire loopback
+```bash
+pactl load-module module-loopback
 ```
 
-**High CPU usage**
-- Reduce segment frequency (increase `segmentDurationMs`)
-- Lower audio sample rate if acceptable
-- Disable screen capture if only audio is needed
+#### Permission Errors
 
-## License
+Use the built-in permission management:
+```javascript
+const instructions = getSystemAudioSetupInstructions();
+console.log(instructions);
+```
 
-MIT License - see [LICENSE](LICENSE) file for details.
+#### Build Errors
 
-## Contributing
+Ensure all native dependencies are installed:
+```bash
+# macOS
+xcode-select --install
 
-Contributions welcome! Please read our [Contributing Guide](CONTRIBUTING.md) first.
+# Ubuntu/Debian
+sudo apt-get install build-essential libasound2-dev
 
-## Related Projects
+# Windows - Install Visual Studio Build Tools
+```
 
-- [Cap](https://github.com/cap-so/cap) - The main Cap screen recording application
-- [scap](https://github.com/gyroflow/scap) - Screen capture library
-- [cpal](https://github.com/rustaudio/cpal) - Cross-platform audio I/O library
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### Development Setup
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Built on top of the excellent [cpal](https://github.com/RustAudio/cpal) audio library
+- Inspired by the original [Cap](https://github.com/cap-so/cap) screen recording app
+- Uses [napi-rs](https://github.com/napi-rs/napi-rs) for seamless Node.js integration
+
+---
+
+**Perfect for building:**
+- 🎙️ Real-time transcription applications
+- 📹 Screen recording with audio
+- 🎵 Audio analysis tools
+- 📱 Voice-controlled applications
+- 🤖 AI-powered audio processing
