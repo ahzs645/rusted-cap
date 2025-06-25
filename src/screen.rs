@@ -12,6 +12,10 @@ pub struct Display {
     pub name: String,
     /// Display resolution
     pub resolution: (u32, u32),
+    /// Display width (for easier access)
+    pub width: u32,
+    /// Display height (for easier access)
+    pub height: u32,
     /// Display position
     pub position: (i32, i32),
     /// Is primary display
@@ -339,6 +343,8 @@ fn get_macos_displays() -> CaptureResult<Vec<Display>> {
             id: 0,
             name: "Built-in Display".to_string(),
             resolution: (1920, 1080),
+            width: 1920,
+            height: 1080,
             position: (0, 0),
             is_primary: true,
             scale_factor: 2.0,
@@ -354,6 +360,8 @@ fn get_windows_displays() -> CaptureResult<Vec<Display>> {
             id: 0,
             name: "Primary Display".to_string(),
             resolution: (1920, 1080),
+            width: 1920,
+            height: 1080,
             position: (0, 0),
             is_primary: true,
             scale_factor: 1.0,
@@ -369,6 +377,8 @@ fn get_linux_displays() -> CaptureResult<Vec<Display>> {
             id: 0,
             name: "Primary Display".to_string(),
             resolution: (1920, 1080),
+            width: 1920,
+            height: 1080,
             position: (0, 0),
             is_primary: true,
             scale_factor: 1.0,
