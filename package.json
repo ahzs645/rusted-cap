@@ -1,0 +1,53 @@
+{
+  "name": "cap-electron-capture",
+  "version": "0.1.0",
+  "description": "Cross-platform screen capture and audio processing library for Electron applications",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "napi": {
+    "name": "cap-electron-capture",
+    "triples": {
+      "defaults": true,
+      "additional": [
+        "x86_64-pc-windows-msvc",
+        "x86_64-apple-darwin",
+        "aarch64-apple-darwin",
+        "x86_64-unknown-linux-gnu"
+      ]
+    }
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@napi-rs/cli": "^2.18.0"
+  },
+  "engines": {
+    "node": ">= 10"
+  },
+  "scripts": {
+    "artifacts": "napi artifacts",
+    "build": "napi build --platform --release",
+    "build:debug": "napi build --platform",
+    "prepublishOnly": "napi prepublish -t npm",
+    "test": "node test.js",
+    "universal": "napi universal",
+    "version": "napi version"
+  },
+  "keywords": [
+    "screen-capture",
+    "audio-capture",
+    "electron",
+    "transcription",
+    "real-time",
+    "cross-platform",
+    "rust",
+    "napi"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cap-so/cap.git"
+  },
+  "bugs": {
+    "url": "https://github.com/cap-so/cap/issues"
+  },
+  "homepage": "https://github.com/cap-so/cap#readme"
+}

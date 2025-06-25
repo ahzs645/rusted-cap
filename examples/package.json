@@ -1,0 +1,20 @@
+{
+  "name": "cap-electron-capture-example",
+  "version": "1.0.0",
+  "description": "Electron example for Cap Electron Capture library",
+  "main": "electron-main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "NODE_ENV=development electron .",
+    "install-deps": "npm install electron --save-dev"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0"
+  },
+  "keywords": [
+    "electron",
+    "transcription",
+    "audio-capture",
+    "cap"
+  ]
+}

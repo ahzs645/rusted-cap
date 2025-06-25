@@ -1,0 +1,64 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build Native Module",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"build"
+			],
+			"group": "build",
+			"isBackground": false,
+			"problemMatcher": [
+				"$rustc"
+			]
+		},
+		{
+			"label": "Build Debug",
+			"type": "shell",
+			"command": "npm",
+			"args": ["run", "build:debug"],
+			"group": "build",
+			"problemMatcher": ["$rustc"],
+			"isBackground": false
+		},
+		{
+			"label": "Check Rust Code",
+			"type": "shell",
+			"command": "cargo",
+			"args": ["check"],
+			"group": "build",
+			"problemMatcher": ["$rustc"],
+			"isBackground": false
+		},
+		{
+			"label": "Run Tests",
+			"type": "shell",
+			"command": "npm",
+			"args": ["test"],
+			"group": "test",
+			"problemMatcher": [],
+			"isBackground": false
+		},
+		{
+			"label": "Install Dependencies",
+			"type": "shell",
+			"command": "npm",
+			"args": ["install"],
+			"group": "build",
+			"problemMatcher": [],
+			"isBackground": false
+		},
+		{
+			"label": "Clean Build",
+			"type": "shell",
+			"command": "cargo",
+			"args": ["clean"],
+			"group": "build",
+			"problemMatcher": [],
+			"isBackground": false
+		}
+	]
+}
