@@ -35,12 +35,12 @@ async function testCapEncodingPipeline() {
             // Audio settings for transcription
             audio: {
                 enabled: true,
-                systemAudio: true,
+                system_audio: true,
                 microphone: true,
-                sampleRate: 48000,
+                sample_rate: 48000,
                 channels: 2,
-                segmentDurationMs: 2000, // 2 second segments like Cap
-                format: "Float32"
+                segment_duration_ms: 2000, // 2 second segments like Cap
+                format: "Aac"
             },
             
             // Screen capture settings
@@ -48,7 +48,7 @@ async function testCapEncodingPipeline() {
                 enabled: true,
                 fps: 30,
                 quality: 80,
-                includeCursor: true
+                include_cursor: true
             },
             
             // Encoding settings (Cap's pipeline)

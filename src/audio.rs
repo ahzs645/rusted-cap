@@ -66,6 +66,7 @@ pub struct AudioProcessor {
     system_audio_stream: Option<Stream>,
     segment_sender: Option<mpsc::UnboundedSender<AudioSegment>>,
     is_running: Arc<Mutex<bool>>,
+    #[allow(dead_code)]
     audio_buffer: Arc<Mutex<VecDeque<f32>>>,
 }
 
@@ -596,6 +597,7 @@ impl AudioProcessor {
     }
 
     #[cfg(target_os = "macos")]
+    #[allow(dead_code)]
     fn create_screencapturekit_stream(&self, _tx: mpsc::UnboundedSender<AudioSegment>) -> CaptureResult<Stream> {
         // This is a placeholder for actual ScreenCaptureKit integration
         // In a complete implementation, this would:

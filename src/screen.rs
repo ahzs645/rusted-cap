@@ -57,6 +57,7 @@ pub struct ScreenFrame {
 }
 
 /// Screen capture implementation
+#[derive(Clone)]
 pub struct ScreenCapture {
     config: ScreenCaptureConfig,
     is_running: Arc<Mutex<bool>>,
@@ -126,6 +127,21 @@ impl ScreenCapture {
 
         log::info!("Screen capture stopped successfully");
         Ok(())
+    }
+
+    /// Get available displays (method version for compatibility)
+    pub fn get_available_displays(&self) -> CaptureResult<Vec<Display>> {
+        get_available_displays()
+    }
+
+    /// Start capture and return frame receiver 
+    pub async fn start_capture(&mut self) -> CaptureResult<mpsc::UnboundedReceiver<ScreenFrame>> {
+        self.start().await
+    }
+
+    /// Stop capture
+    pub async fn stop_capture(&mut self) -> CaptureResult<()> {
+        self.stop().await
     }
 
     /// Start platform-specific capture implementation

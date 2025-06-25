@@ -3,9 +3,9 @@
 //! Implements Cap's S3 upload strategy for real-time HLS streaming
 
 use crate::error::{CaptureError, CaptureResult};
-use super::{EncodedAudioSegment, EncodedVideoSegment, HLSSegment, S3ContentType};
+use super::{EncodedAudioSegment, EncodedVideoSegment, S3ContentType};
 use aws_sdk_s3::{Client, config::Region};
-use aws_config::load_from_env;
+use aws_config::load_defaults;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::time::timeout;
@@ -26,6 +26,7 @@ pub struct UploadConfig {
 }
 
 /// S3 uploader for real-time streaming
+#[derive(Clone)]
 pub struct S3Uploader {
     client: Client,
     config: UploadConfig,
@@ -39,7 +40,7 @@ impl S3Uploader {
         log::info!("Initializing S3 uploader for user {} video {}", user_id, video_id);
 
         // Load AWS configuration
-        let aws_config = load_from_env().await;
+        let aws_config = load_defaults(aws_config::BehaviorVersion::latest()).await;
         let mut s3_config_builder = aws_sdk_s3::config::Builder::from(&aws_config);
 
         // Set region
@@ -175,20 +176,23 @@ impl S3Uploader {
                                      video_segments: Vec<EncodedVideoSegment>) -> CaptureResult<Vec<String>> {
         let mut uploaded_keys = Vec::new();
 
-        // Upload in parallel for better performance
-        let upload_futures = audio_segments.into_iter().map(|segment| {
-            self.upload_audio_segment_realtime(segment)
-        }).chain(video_segments.into_iter().map(|segment| {
-            self.upload_video_segment_realtime(segment)
-        }));
-
-        let results = futures::future::join_all(upload_futures).await;
-
-        for result in results {
-            match result {
+        // Upload audio segments
+        for segment in audio_segments {
+            match self.upload_audio_segment_realtime(segment).await {
                 Ok(key) => uploaded_keys.push(key),
                 Err(e) => {
-                    log::error!("Failed to upload segment: {}", e);
+                    log::error!("Failed to upload audio segment: {}", e);
+                    return Err(e);
+                }
+            }
+        }
+
+        // Upload video segments
+        for segment in video_segments {
+            match self.upload_video_segment_realtime(segment).await {
+                Ok(key) => uploaded_keys.push(key),
+                Err(e) => {
+                    log::error!("Failed to upload video segment: {}", e);
                     return Err(e);
                 }
             }
@@ -253,7 +257,7 @@ impl S3Uploader {
 }
 
 /// Create S3 uploader with Cap's production settings
-pub fn create_cap_s3_uploader(bucket: String, user_id: String, video_id: String) -> UploadConfig {
+pub fn create_cap_s3_uploader(bucket: String, _user_id: String, _video_id: String) -> UploadConfig {
     UploadConfig {
         bucket,
         region: "us-east-1".to_string(), // Cap's primary region

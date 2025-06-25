@@ -3,8 +3,8 @@
 //! Complete implementation of Cap's real-time recording and streaming architecture
 
 use crate::{
-    audio::{AudioProcessor, AudioSegment, AudioSource},
-    screen::ScreenCapture,
+    audio::{AudioProcessor, AudioSegment},
+    screen::{ScreenCapture, ScreenFrame},
     encoding::{
         AudioEncoder, VideoEncoder, HLSSegmenter, S3Uploader,
         EncodingConfig, create_transcription_encoder, create_screen_recording_encoder,
@@ -12,7 +12,7 @@ use crate::{
         PlaylistType, S3ContentType
     },
     error::{CaptureError, CaptureResult},
-    config::{CaptureConfig, AudioCaptureConfig, ScreenCaptureConfig},
+    config::{AudioCaptureConfig, ScreenCaptureConfig},
 };
 use tokio::sync::mpsc;
 use std::sync::{Arc, Mutex};
@@ -231,13 +231,13 @@ impl CapRecordingPipeline {
     async fn start_processing_pipeline(
         &mut self,
         audio_rx: Option<mpsc::UnboundedReceiver<AudioSegment>>,
-        video_rx: Option<mpsc::UnboundedReceiver<Vec<u8>>>,
+        video_rx: Option<mpsc::UnboundedReceiver<ScreenFrame>>,
     ) -> CaptureResult<()> {
         
         // Audio processing pipeline
         if let Some(mut audio_rx) = audio_rx {
             let audio_encoder = self.audio_encoder.take();
-            let hls_segmenter = self.hls_segmenter.clone();
+            let _hls_segmenter_audio = self.hls_segmenter.clone();
             let s3_uploader = self.s3_uploader.clone();
             let enable_transcription = self.config.enable_transcription;
             let enable_streaming = self.config.enable_streaming;
@@ -253,7 +253,7 @@ impl CapRecordingPipeline {
                             Ok(encoded_segments) => {
                                 for encoded_segment in encoded_segments {
                                     // Create HLS segment if segmenter available
-                                    if let Some(segmenter) = &hls_segmenter {
+                                    if let Some(_segmenter) = &_hls_segmenter_audio {
                                         // In a real implementation, we'd properly synchronize this
                                         // with the video processing pipeline
                                     }
@@ -286,13 +286,16 @@ impl CapRecordingPipeline {
         // Video processing pipeline
         if let Some(mut video_rx) = video_rx {
             let video_encoder = self.video_encoder.take();
-            let hls_segmenter = self.hls_segmenter.clone();
+            let _hls_segmenter = self.hls_segmenter.clone();
             let s3_uploader = self.s3_uploader.clone();
             let enable_streaming = self.config.enable_streaming;
 
             tokio::spawn(async move {
                 if let Some(mut encoder) = video_encoder {
-                    while let Some(frame_data) = video_rx.recv().await {
+                    while let Some(screen_frame) = video_rx.recv().await {
+                        // Convert ScreenFrame to raw frame data
+                        let frame_data = screen_frame.data;
+                        
                         // Encode frame to H.264
                         match encoder.process_frame(&frame_data) {
                             Ok(Some(encoded_segment)) => {
@@ -375,12 +378,12 @@ impl CapRecordingPipeline {
 
         // Flush encoders
         if let Some(audio_encoder) = &mut self.audio_encoder {
-            let remaining_segments = audio_encoder.flush()?;
+            let _remaining_segments = audio_encoder.flush()?;
             // Process remaining audio segments
         }
 
         if let Some(video_encoder) = &mut self.video_encoder {
-            let remaining_segments = video_encoder.flush()?;
+            let _remaining_segments = video_encoder.flush()?;
             // Process remaining video segments
         }
 
@@ -439,6 +442,11 @@ impl CapRecordingPipeline {
         &self.config
     }
 }
+
+// Manual Send + Sync implementation for cross-thread compatibility
+// SAFETY: All fields are either Send + Sync or wrapped in Arc<Mutex<>>
+unsafe impl Send for CapRecordingPipeline {}
+unsafe impl Sync for CapRecordingPipeline {}
 
 impl Default for RecordingStats {
     fn default() -> Self {

@@ -8,12 +8,11 @@ pub mod video_encoder;
 pub mod hls;
 pub mod s3_uploader;
 
-pub use audio_encoder::{AudioEncoder, EncodedAudioSegment};
-pub use video_encoder::{VideoEncoder, EncodedVideoSegment};
-pub use hls::{HLSSegmenter, HLSSegment, HLSPlaylist};
-pub use s3_uploader::{S3Uploader, UploadConfig};
+pub use audio_encoder::{AudioEncoder, EncodedAudioSegment, create_transcription_encoder};
+pub use video_encoder::{VideoEncoder, EncodedVideoSegment, create_screen_recording_encoder};
+pub use hls::{HLSSegmenter, HLSSegment, HLSPlaylist, PlaylistType, S3ContentType, create_cap_hls_segmenter};
+pub use s3_uploader::{S3Uploader, UploadConfig, create_cap_s3_uploader};
 
-use crate::error::CaptureResult;
 use serde::{Deserialize, Serialize};
 
 /// Encoding configuration

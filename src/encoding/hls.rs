@@ -2,7 +2,7 @@
 //! 
 //! Implements Cap's HLS streaming approach with real-time segment management
 
-use crate::error::{CaptureError, CaptureResult};
+use crate::error::CaptureResult;
 use super::{HLSConfig, EncodedAudioSegment, EncodedVideoSegment};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
@@ -45,6 +45,7 @@ pub struct HLSPlaylist {
 }
 
 /// HLS segmenter following Cap's approach
+#[derive(Clone)]
 pub struct HLSSegmenter {
     config: HLSConfig,
     segments: VecDeque<HLSSegment>,
