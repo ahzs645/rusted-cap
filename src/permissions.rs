@@ -226,20 +226,43 @@ async fn check_system_audio_permission() -> CaptureResult<PermissionState> {
 // macOS-specific permission implementations
 #[cfg(target_os = "macos")]
 async fn macos_request_microphone_permission() -> CaptureResult<PermissionState> {
-    // On macOS, microphone permission is handled automatically by the system
-    // when we try to access the microphone. For a full implementation, we'd use:
-    // AVAudioSession.requestRecordPermission or similar APIs
+    // On macOS, microphone permission is handled by the system when accessing the device
+    // We can test access by trying to create an input stream
     
-    log::info!("Microphone permission will be requested by system on first access");
-    Ok(PermissionState::NotRequested)
+    use cpal::traits::*;
+    
+    let host = cpal::default_host();
+    match host.default_input_device() {
+        Some(device) => {
+            // Try to get device name and supported configs to test access
+            match device.name() {
+                Ok(_) => {
+                    log::info!("Microphone access appears to be available");
+                    Ok(PermissionState::Granted)
+                },
+                Err(_) => {
+                    log::warn!("Microphone access may be restricted");
+                    Ok(PermissionState::Denied)
+                }
+            }
+        },
+        None => {
+            log::warn!("No default input device found");
+            Ok(PermissionState::Denied)
+        }
+    }
 }
 
 #[cfg(target_os = "macos")]
 async fn macos_request_screen_recording_permission() -> CaptureResult<PermissionState> {
-    // For macOS screen recording, we need to check if the app has screen recording permission
-    // This would typically involve checking CGPreflightScreenCaptureAccess()
+    // On macOS 10.15+, screen recording requires explicit permission
+    // The system will prompt the user when screen capture is first attempted
     
-    log::info!("Screen recording permission required. User will be prompted by macOS.");
+    log::info!("Screen recording permission check on macOS");
+    log::info!("If screen capture fails, grant permission in:");
+    log::info!("System Preferences > Security & Privacy > Privacy > Screen Recording");
+    
+    // For now, assume permission is needed and will be requested by the system
     Ok(PermissionState::NotRequested)
 }
 

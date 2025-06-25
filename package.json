@@ -27,10 +27,13 @@
     "artifacts": "napi artifacts",
     "build": "napi build --platform --release",
     "build:debug": "napi build --platform",
+    "install": "npm run build",
+    "postinstall": "npm run build:debug",
     "prepublishOnly": "napi prepublish -t npm",
     "test": "node test.js",
     "universal": "napi universal",
-    "version": "napi version"
+    "version": "napi version",
+    "clean": "cargo clean && rm -f *.node"
   },
   "keywords": [
     "screen-capture",
