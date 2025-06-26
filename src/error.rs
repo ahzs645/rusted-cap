@@ -89,6 +89,10 @@ pub enum AudioError {
     /// Audio buffer overflow/underflow
     #[error("Audio buffer error: {0}")]
     BufferError(String),
+    
+    /// Permission denied for audio capture
+    #[error("Permission denied for audio capture: {0}")]
+    PermissionDenied(String),
 }
 
 /// Screen capture specific errors

@@ -12,8 +12,14 @@ name = "cap_electron_capture"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+# Core dependencies from Cap
+cidre = { git = "https://github.com/yury/cidre", rev = "ef04aaabe14ffbbce4a330973a74b6d797d073ff" }
+ffmpeg = { package = "ffmpeg-next", git = "https://github.com/CapSoftware/rust-ffmpeg", rev = "49db1fede112" }
+scap = { git = "https://github.com/CapSoftware/scap", rev = "b914379d787f" }
+tokio = { version = "1.39.3", features = ["macros", "rt-multi-thread", "sync", "time"] }
+log = "0.4"
+
 # Core async runtime
-tokio = { version = "1.0", features = ["full"] }
 futures = "0.3"
 
 # Audio processing
@@ -21,11 +27,7 @@ cpal = { git = "https://github.com/RustAudio/cpal", rev = "f43d36e55494993bbbde3
 hound = "3.5"
 
 # FFmpeg for audio/video encoding (Cap's fork)
-ffmpeg = { package = "ffmpeg-next", git = "https://github.com/CapSoftware/rust-ffmpeg", rev = "49db1fede112" }
 ffmpeg-sys-next = { version = "7.1.0", features = ["build"] }
-
-# Cap's screen capture library
-scap = { git = "https://github.com/CapSoftware/scap", rev = "b914379d787f" }
 
 # S3 and cloud storage
 aws-sdk-s3 = "1.0"
@@ -40,15 +42,14 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 anyhow = "1.0"
 thiserror = "1.0"
-log = "0.4"
 env_logger = "0.10"
 uuid = { version = "1.0", features = ["v4"] }
 lazy_static = "1.4"
 
 # Platform-specific dependencies
 [target.'cfg(target_os = "macos")'.dependencies]
-# 🎯 REAL Cap dependencies for system audio capture
 cidre = { git = "https://github.com/yury/cidre", rev = "ef04aaabe14ffbbce4a330973a74b6d797d073ff" }
+# 🎯 REAL Cap dependencies for system audio capture
 screencapturekit = { git = "https://github.com/CapSoftware/screencapturekit-rs", rev = "7ff1e103742e56c8f6c2e940b5e52684ed0bed69" }
 core-foundation = "0.9"
 core-graphics = "0.23"

@@ -1,4 +1,5 @@
 use crate::CaptureResult;
+use crate::screencapturekit::is_screencapturekit_available;
 use cpal::traits::HostTrait;
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -16,6 +17,8 @@ pub struct PlatformCapabilities {
     pub system_version: String,
     /// Available permissions
     pub permissions: PermissionStatus,
+    /// ScreenCaptureKit availability (macOS only)
+    pub screencapturekit: bool,
 }
 
 /// Platform types
@@ -99,6 +102,7 @@ pub fn get_platform_capabilities() -> PlatformCapabilities {
         screen: get_screen_capabilities(),
         system_version: get_system_version(),
         permissions: get_permission_status(),
+        screencapturekit: is_screencapturekit_available(),
         platform,
     }
 }

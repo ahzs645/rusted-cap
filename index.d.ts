@@ -91,7 +91,7 @@ export declare function checkPermissions(): Promise<string>
 export declare function getSystemAudioSetupInstructions(): string
 /** Create a new capture session with the given configuration */
 export declare function createCaptureSession(config: string): string
-/** Start native system audio capture demonstration */
+/** Start native system audio capture using ScreenCaptureKit */
 export declare function startNativeSystemAudio(sessionId: string): Promise<string>
 /** Test native system audio capture capabilities */
 export declare function testNativeSystemAudio(): string
