@@ -4,6 +4,7 @@ use napi_derive::napi;
 /// Main configuration for the capture session
 #[napi(object)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CaptureConfig {
     /// Audio capture configuration
     pub audio: AudioCaptureConfig,
@@ -26,6 +27,7 @@ impl Default for CaptureConfig {
 /// Audio capture configuration
 #[napi(object)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AudioCaptureConfig {
     /// Enable audio capture
     pub enabled: bool,
@@ -63,6 +65,7 @@ impl Default for AudioCaptureConfig {
 /// Screen capture configuration
 #[napi(object)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ScreenCaptureConfig {
     /// Enable screen capture
     pub enabled: bool,
@@ -94,6 +97,7 @@ impl Default for ScreenCaptureConfig {
 /// Output format configuration
 #[napi(object)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OutputFormat {
     /// Audio output format
     pub audio: AudioFormat,

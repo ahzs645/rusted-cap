@@ -245,11 +245,60 @@ impl AudioProcessor {
 
     #[cfg(target_os = "macos")]
     fn create_macos_system_audio_stream(&self, tx: mpsc::UnboundedSender<AudioSegment>) -> CaptureResult<Stream> {
-        log::info!("Initializing macOS system audio capture via ScreenCaptureKit");
+        log::info!("🎯 Initializing REAL macOS system audio capture via ScreenCaptureKit");
         
-        // For now, we'll use a hybrid approach:
-        // 1. Try to create a loopback device capture (requires virtual audio setup)
-        // 2. Fall back to a placeholder that guides users to set up system audio
+        // Check if ScreenCaptureKit is available
+        if !crate::screencapturekit::is_screencapturekit_available() {
+            log::warn!("ScreenCaptureKit not available, falling back to virtual audio device detection");
+            return self.create_macos_fallback_stream(tx);
+        }
+        
+        // 🔥 REAL Cap Implementation using ScreenCaptureKit
+        let sck_audio = crate::screencapturekit::ScreenCaptureKitAudio::new(
+            self.config.sample_rate,
+            self.config.channels,
+            self.config.segment_duration_ms,
+        );
+        
+        // Start ScreenCaptureKit capture in background task
+        let rt = tokio::runtime::Handle::current();
+        rt.spawn(async move {
+            if let Err(e) = sck_audio.start_capture(tx).await {
+                log::error!("ScreenCaptureKit audio capture failed: {}", e);
+            }
+        });
+        
+        // Create a dummy stream for compatibility
+        let host = cpal::default_host();
+        let device = host.default_input_device()
+            .ok_or_else(|| CaptureError::Audio(AudioError::DeviceNotFound("default input".to_string())))?;
+            
+        let config = StreamConfig {
+            channels: 2, // ScreenCaptureKit provides stereo
+            sample_rate: cpal::SampleRate(48000), // ScreenCaptureKit uses 48kHz
+            buffer_size: cpal::BufferSize::Default,
+        };
+        
+        let stream = device.build_input_stream(
+            &config,
+            move |_data: &[f32], _: &cpal::InputCallbackInfo| {
+                // ScreenCaptureKit handles the actual audio capture
+            },
+            move |err| {
+                log::error!("Audio stream interface error: {}", err);
+            },
+            None,
+        ).map_err(|e| CaptureError::Audio(AudioError::StreamError(
+            format!("Failed to create ScreenCaptureKit audio interface: {}", e)
+        )))?;
+
+        log::info!("✅ ScreenCaptureKit system audio capture initialized");
+        Ok(stream)
+    }
+    
+    #[cfg(target_os = "macos")]
+    fn create_macos_fallback_stream(&self, tx: mpsc::UnboundedSender<AudioSegment>) -> CaptureResult<Stream> {
+        log::info!("🔄 Using fallback virtual audio device detection for system audio");
         
         let host = cpal::default_host();
         
@@ -257,9 +306,11 @@ impl AudioProcessor {
         let system_device = if let Ok(mut devices) = host.output_devices() {
             devices.find(|device| {
                 if let Ok(name) = device.name() {
-                    name.to_lowercase().contains("blackhole") || 
-                    name.to_lowercase().contains("soundflower") ||
-                    name.to_lowercase().contains("virtual")
+                    let name_lower = name.to_lowercase();
+                    name_lower.contains("blackhole") || 
+                    name_lower.contains("soundflower") ||
+                    name_lower.contains("virtual") ||
+                    name_lower.contains("loopback")
                 } else {
                     false
                 }
@@ -269,10 +320,10 @@ impl AudioProcessor {
         };
 
         let device = if let Some(virtual_device) = system_device {
-            log::info!("Found virtual audio device for system audio capture");
+            log::info!("✅ Found virtual audio device for system audio capture");
             virtual_device
         } else {
-            log::warn!("No virtual audio device found. System audio capture requires BlackHole or similar virtual audio driver. Using default output device as placeholder.");
+            log::warn!("⚠️  No virtual audio device found. For full system audio capture, install BlackHole or use ScreenCaptureKit-compatible macOS version");
             host.default_output_device()
                 .ok_or_else(|| CaptureError::Audio(AudioError::DeviceNotFound("default output".to_string())))?
         };
@@ -287,12 +338,6 @@ impl AudioProcessor {
         let channels = self.config.channels;
         let segment_duration_samples = (sample_rate * self.config.segment_duration_ms / 1000) as usize;
         let buffer = Arc::new(Mutex::new(Vec::<f32>::new()));
-
-        // Note: This is a simplified implementation. Full ScreenCaptureKit integration would require:
-        // 1. Requesting screen recording permission
-        // 2. Creating SCStream with audio capture enabled
-        // 3. Implementing SCStreamDelegate for audio callbacks
-        // 4. Converting CMSampleBuffer to our audio format
         
         let stream = device.build_input_stream(
             &config,
@@ -321,11 +366,11 @@ impl AudioProcessor {
                 }
             },
             move |err| {
-                log::error!("System audio stream error: {}", err);
+                log::error!("Virtual audio device stream error: {}", err);
             },
             None,
         ).map_err(|e| CaptureError::Audio(AudioError::StreamError(
-            format!("Failed to create macOS system audio stream. Consider installing BlackHole for proper system audio capture: {}", e)
+            format!("Failed to create virtual audio stream: {}", e)
         )))?;
 
         Ok(stream)
@@ -593,26 +638,6 @@ impl AudioProcessor {
     fn encode_aac(&self, _pcm_data: &[f32]) -> CaptureResult<Vec<u8>> {
         Err(CaptureError::Audio(AudioError::EncodingError(
             "AAC encoding requires the 'audio-encoding' feature and FFmpeg. Use WAV format instead.".to_string()
-        )))
-    }
-
-    #[cfg(target_os = "macos")]
-    #[allow(dead_code)]
-    fn create_screencapturekit_stream(&self, _tx: mpsc::UnboundedSender<AudioSegment>) -> CaptureResult<Stream> {
-        // This is a placeholder for actual ScreenCaptureKit integration
-        // In a complete implementation, this would:
-        // 1. Request screen recording permission
-        // 2. Create SCStreamConfiguration with audio enabled
-        // 3. Set up SCStreamDelegate for audio callbacks
-        // 4. Create SCStream and start capturing
-        // 5. Convert CMSampleBuffer audio data to our format
-        
-        log::info!("ScreenCaptureKit system audio capture would be initialized here");
-        
-        // For now, this would require Objective-C bridging and is beyond scope
-        // Users should install BlackHole for system audio capture
-        Err(CaptureError::Audio(AudioError::InitializationFailed(
-            "Native ScreenCaptureKit integration not yet implemented. Please install BlackHole virtual audio driver.".to_string()
         )))
     }
 }

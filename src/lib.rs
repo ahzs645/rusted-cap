@@ -16,6 +16,7 @@ pub mod platform;
 pub mod permissions;
 pub mod encoding;
 pub mod recording;
+pub mod screencapturekit; // 🎯 Real ScreenCaptureKit integration
 
 // Re-export main types
 pub use audio::{AudioProcessor, AudioSegment};
