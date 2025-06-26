@@ -103,3 +103,7 @@ export declare function startRecording(sessionId: string): Promise<string>
 export declare function stopRecording(sessionId: string): Promise<string>
 /** Get encoding capabilities and configuration options */
 export declare function getEncodingCapabilities(): string
+/** Process audio chunk and return encoded segments */
+export declare function processAudioChunk(sessionId: string, pcmData: Array<number>): Promise<string>
+/** Flush encoder and return any remaining segments */
+export declare function flushEncoder(sessionId: string): Promise<string>

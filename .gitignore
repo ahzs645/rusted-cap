@@ -1,6 +1,7 @@
 # Rust
 /target/
 /target_docs/
+/recording/
 **/*.rs.bk
 Cargo.lock
 

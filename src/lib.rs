@@ -378,6 +378,101 @@ pub fn get_encoding_capabilities() -> napi::Result<String> {
         .map_err(|e| napi::Error::from_reason(format!("Failed to serialize capabilities: {}", e)))?)
 }
 
+/// Process audio chunk and return encoded segments
+#[napi]
+pub async fn process_audio_chunk(session_id: String, pcm_data: Vec<u8>) -> napi::Result<String> {
+    log::debug!("Processing audio chunk for session {}: {} bytes", session_id, pcm_data.len());
+    
+    // Convert bytes to f32 samples (assuming little-endian 32-bit floats)
+    if pcm_data.len() % 4 != 0 {
+        return Err(napi::Error::from_reason("PCM data length must be multiple of 4 bytes".to_string()));
+    }
+    
+    let mut samples = Vec::with_capacity(pcm_data.len() / 4);
+    for chunk in pcm_data.chunks_exact(4) {
+        let bytes: [u8; 4] = chunk.try_into()
+            .map_err(|_| napi::Error::from_reason("Failed to convert bytes to f32".to_string()))?;
+        let sample = f32::from_le_bytes(bytes);
+        samples.push(sample);
+    }
+    
+    // Create a temporary audio encoder for this test
+    let audio_config = encoding::AudioEncodingConfig {
+        codec: encoding::AudioCodec::AAC,
+        bitrate: 128000,
+        sample_rate: 48000,
+        channels: 2,
+        channel_layout: encoding::AudioChannelLayout::Stereo,
+    };
+    
+    let mut encoder = encoding::AudioEncoder::new(audio_config)
+        .map_err(|e| napi::Error::from_reason(format!("Failed to create encoder: {}", e)))?;
+    
+    let segments = encoder.process_audio(&samples)
+        .map_err(|e| napi::Error::from_reason(format!("Failed to process audio: {}", e)))?;
+    
+    let result = serde_json::json!({
+        "success": true,
+        "session_id": session_id,
+        "segments": segments.iter().map(|seg| {
+            serde_json::json!({
+                "sequence": seg.sequence,
+                "duration": seg.duration,
+                "timestamp": seg.timestamp,
+                "sample_rate": seg.sample_rate,
+                "channels": seg.channels,
+                "data": seg.data, // Include the actual encoded data
+                "size_bytes": seg.data.len()
+            })
+        }).collect::<Vec<_>>()
+    });
+    
+    log::debug!("Processed {} segments for session {}", segments.len(), session_id);
+    
+    Ok(result.to_string())
+}
+
+/// Flush encoder and return any remaining segments
+#[napi]
+pub async fn flush_encoder(session_id: String) -> napi::Result<String> {
+    log::debug!("Flushing encoder for session {}", session_id);
+    
+    // Create a temporary audio encoder for this test
+    let audio_config = encoding::AudioEncodingConfig {
+        codec: encoding::AudioCodec::AAC,
+        bitrate: 128000,
+        sample_rate: 48000,
+        channels: 2,
+        channel_layout: encoding::AudioChannelLayout::Stereo,
+    };
+    
+    let mut encoder = encoding::AudioEncoder::new(audio_config)
+        .map_err(|e| napi::Error::from_reason(format!("Failed to create encoder: {}", e)))?;
+    
+    let segments = encoder.flush()
+        .map_err(|e| napi::Error::from_reason(format!("Failed to flush encoder: {}", e)))?;
+    
+    let result = serde_json::json!({
+        "success": true,
+        "session_id": session_id,
+        "segments": segments.iter().map(|seg| {
+            serde_json::json!({
+                "sequence": seg.sequence,
+                "duration": seg.duration,
+                "timestamp": seg.timestamp,
+                "sample_rate": seg.sample_rate,
+                "channels": seg.channels,
+                "data": seg.data,
+                "size_bytes": seg.data.len()
+            })
+        }).collect::<Vec<_>>()
+    });
+    
+    log::debug!("Flushed {} segments for session {}", segments.len(), session_id);
+    
+    Ok(result.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
